@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { PlantMap } from '../components/PlantMap.tsx';
 import { ConnectForm } from '../components/ConnectForm.tsx';
+import { CallLink, EmailLink } from '../components/ContactLinks.tsx';
 
 function isKnown(val?: string): boolean {
   return Boolean(val && val.trim().length > 0 && !val.includes('[') && !val.includes(']'));
@@ -135,63 +136,140 @@ export function WhyMyConcretePage() {
 export function PlantLocationPage() {
   const { data } = useApp();
   const biz = data?.businessConfig;
+  const plantLocations =
+    data?.plantLocations && data.plantLocations.length > 0
+      ? data.plantLocations
+      : biz
+        ? [
+            {
+              id: 'kotihal',
+              name: biz.businessName,
+              shortLabel: 'Kotihal',
+              address: biz.address,
+              city: 'Ranebennur',
+              postalCode: '581119',
+              lat: biz.plantLat,
+              lng: biz.plantLng,
+              phone: biz.phone || '+91 73378 07372',
+              whatsapp: biz.whatsapp || biz.phone || '+91 73378 07372',
+              hours: biz.workingHours || 'Open 24 Hours (All Days)',
+              serviceRadiusKm: biz.serviceRadiusKm || 50,
+              googleMapsUrl:
+                biz.googleMapsUrl ||
+                `https://www.google.com/maps/dir/?api=1&destination=${biz.plantLat},${biz.plantLng}`,
+              pinColor: 'blue' as const,
+              isPrimary: true,
+            },
+            {
+              id: 'davangere',
+              name: 'MY CONCRETE – Davangere Unit',
+              shortLabel: 'Davangere',
+              address: 'Davangere, Karnataka 577001',
+              city: 'Davangere',
+              postalCode: '577001',
+              lat: 14.4644,
+              lng: 75.9218,
+              phone: '+91 73378 07372',
+              whatsapp: '+91 73378 07372',
+              hours: 'Open 24 Hours (All Days)',
+              serviceRadiusKm: 50,
+              googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+              pinColor: 'red' as const,
+              isPrimary: false,
+            },
+          ]
+        : [];
 
   useDocumentMeta({
-    title: 'Plant Location & Service Area | MY CONCRETE Kotihal, Ranebennur',
+    title: 'Plant Locations & Service Area | MY CONCRETE Kotihal & Davangere',
     description:
-      'View MY CONCRETE batching unit at FM66+2X6, Kotihal (inside Lucky Artificial Sand Industry premises), serving Ranebennur and Davangere 24 hours.',
+      'View MY CONCRETE batching units at Kotihal (near Ranebennur) and Davangere serving Ranebennur, Davangere, Harihar, and Haveri 24 hours.',
   });
-
-  const directionsUrl =
-    biz?.googleMapsUrl ||
-    (biz ? `https://www.google.com/maps/dir/?api=1&destination=${biz.plantLat},${biz.plantLng}` : '#');
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-8">
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-[#D92B25]">Kotihal Plant &amp; Dispatch Yard</p>
+        <p className="text-xs font-semibold text-[#D92B25]">Kotihal &amp; Davangere Dispatch Units</p>
         <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-[#0F1F5C] dark:text-white">
-          Plant Location &amp; Service Coverage
+          Plant Locations &amp; Service Coverage
         </h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        <div className="lg:col-span-5 warm-card p-6 space-y-4">
-          <div className="flex items-start gap-2.5">
-            <MapPin className="w-5 h-5 text-[#D92B25] mt-0.5 shrink-0" />
-            <div>
-              <h2 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
-                {biz?.businessName}
-              </h2>
-              <p className="text-sm text-[var(--muted)] mt-1">{biz?.address}</p>
-            </div>
-          </div>
-          <div className="text-sm space-y-1.5 text-[var(--muted)] border-t border-[#D7E4FF] dark:border-[#264096] pt-4">
-            <p>Region: {biz?.region}</p>
-            <p className="text-emerald-600 dark:text-emerald-400 font-semibold">
-              Working Hours: {biz?.workingHours}
-            </p>
-            <p className="tabular-nums">Service Radius: {biz?.serviceRadiusKm || 50} km</p>
-            <p className="tabular-nums">Phone / WhatsApp: {biz?.phone}</p>
-            <p>Email: {biz?.email}</p>
-          </div>
-          <div className="flex flex-wrap gap-3 pt-2">
-            <a
-              href={directionsUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-orange-pill px-4 py-2 text-sm"
-            >
-              <Navigation className="w-4 h-4" />
-              <span>Get Directions</span>
-            </a>
-            <Link
-              to="/site-visit"
-              className="rounded-full border border-[#D7E4FF] dark:border-[#264096] px-4 py-2 text-sm font-semibold hover:border-[#D92B25]"
-            >
-              Book Plant Visit
-            </Link>
-          </div>
+        <div className="lg:col-span-5 space-y-4">
+          {plantLocations.map((loc) => {
+            const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
+            const locDirections =
+              loc.googleMapsUrl ||
+              `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+            return (
+              <div key={loc.id} className="warm-card p-5 space-y-3.5">
+                <div className="flex items-start gap-2.5">
+                  <span
+                    className={`inline-flex items-center justify-center shrink-0 w-7 h-7 rounded-full text-[11px] font-extrabold text-white mt-0.5 ${
+                      isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                    }`}
+                  >
+                    {isRed ? <MapPin className="w-4 h-4" /> : 'MC'}
+                  </span>
+                  <div>
+                    <h2 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
+                      {loc.name}
+                    </h2>
+                    <p className="text-sm text-[var(--muted)] mt-1">{loc.address}</p>
+                  </div>
+                </div>
+                <div className="text-xs sm:text-sm space-y-1 text-[var(--muted)] border-t border-[#D7E4FF] dark:border-[#264096] pt-3">
+                  <p className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Hours: {loc.hours}
+                  </p>
+                  <p className="tabular-nums">Service Radius: {loc.serviceRadiusKm || 50} km</p>
+                  <p className="tabular-nums">
+                    Phone / WhatsApp:{' '}
+                    <CallLink
+                      phone={loc.phone || biz?.phone || '+91 73378 07372'}
+                      whatsapp={loc.whatsapp || loc.phone || biz?.whatsapp || '+91 73378 07372'}
+                      className="font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                    >
+                      {loc.phone || '+91 73378 07372'}
+                    </CallLink>
+                  </p>
+                  <p>
+                    Email:{' '}
+                    <EmailLink
+                      email={biz?.email || 'myconcretektl@gmail.com'}
+                      className="font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                    >
+                      {biz?.email || 'myconcretektl@gmail.com'}
+                    </EmailLink>
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  <a
+                    href={locDirections}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-orange-pill px-4 py-2 text-xs"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>Get Directions</span>
+                  </a>
+                  <Link
+                    to={`/book?plant=${encodeURIComponent(loc.id)}`}
+                    className="btn-blue-pill px-4 py-2 text-xs"
+                  >
+                    Book Delivery
+                  </Link>
+                  <Link
+                    to="/site-visit"
+                    className="rounded-full border border-[#D7E4FF] dark:border-[#264096] px-4 py-2 text-xs font-semibold hover:border-[#D92B25]"
+                  >
+                    Plant Visit
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="lg:col-span-7">
@@ -202,8 +280,9 @@ export function PlantLocationPage() {
               serviceRadiusKm={biz.serviceRadiusKm}
               plantName={biz.businessName}
               plantAddress={biz.address}
+              locations={plantLocations}
               googleMapsUrl={biz.googleMapsUrl}
-              heightClass="h-[420px]"
+              heightClass="h-[460px]"
             />
           )}
         </div>
@@ -248,7 +327,7 @@ export function CareersPage() {
       </div>
 
       <div className="warm-card p-6 sm:p-8">
-        <ConnectForm title="Submit Your Application / Interest" />
+        <ConnectForm type="careers" title="Submit Your Application / Interest" />
       </div>
     </div>
   );

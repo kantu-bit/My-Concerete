@@ -16,6 +16,7 @@ import { useApp } from '../context/AppContext.tsx';
 import { buildWhatsAppUrl, cleanPhoneDigits, isPlaceholderValue } from '../utils/documents.ts';
 import { ConnectForm } from './ConnectForm.tsx';
 import { BrandLogo } from './BrandLogo.tsx';
+import { CallLink, CopyPhoneButton, EmailLink } from './ContactLinks.tsx';
 
 function SocialGlyph({ name }: { name: 'facebook' | 'instagram' | 'youtube' | 'whatsapp' | 'linkedin' }) {
   switch (name) {
@@ -85,7 +86,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const emailDisplay = biz?.email || 'myconcretektl@gmail.com';
   const whatsappDisplay = biz?.whatsapp || biz?.phone || '+91 73378 07372';
 
-  const phoneHref = `tel:+${cleanPhoneDigits(phoneDisplay)}`;
   const whatsappHref = buildWhatsAppUrl(
     whatsappDisplay,
     'Hi MY CONCRETE, I would like to enquire about ready-mix concrete.'
@@ -116,26 +116,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <BrandLogo onWhitePlate plateSize="topbar" />
           </Link>
 
-          <div className="flex items-center gap-8 text-[15px] font-sans">
-            <a
-              href={phoneHref}
-              className="inline-flex items-center gap-2.5 text-white hover:text-[#FFC93C] transition-colors whitespace-nowrap"
+          <div className="flex items-center gap-8 text-[15px] font-sans relative z-50">
+            <CallLink
+              phone={phoneDisplay}
+              whatsapp={whatsappDisplay}
+              className="top-phone hover:text-[#FFC93C] transition-colors whitespace-nowrap"
             >
               <span className="w-7 h-7 rounded-[6px] border border-white/75 flex items-center justify-center shrink-0">
                 <Phone className="w-3.5 h-3.5" />
               </span>
               <span className="tabular-nums font-medium">{phoneDisplay}</span>
-            </a>
+            </CallLink>
 
-            <a
-              href={`mailto:${emailDisplay}`}
-              className="inline-flex items-center gap-2.5 text-white hover:text-[#FFC93C] transition-colors whitespace-nowrap"
+            <EmailLink
+              email={emailDisplay}
+              className="top-email hover:text-[#FFC93C] transition-colors whitespace-nowrap"
             >
               <span className="w-7 h-7 rounded-[6px] border border-white/75 flex items-center justify-center shrink-0">
                 <Mail className="w-3.5 h-3.5" />
               </span>
               <span className="font-medium">{emailDisplay}</span>
-            </a>
+            </EmailLink>
 
             <div className="flex items-center gap-4">
               {biz?.facebookUrl && !isPlaceholderValue(biz.facebookUrl) && (
@@ -222,15 +223,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <BrandLogo onWhitePlate compact />
           </Link>
 
-          <div className="flex items-center gap-2">
-            <a
-              href={phoneHref}
-              aria-label="Call MY CONCRETE"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/60 px-2.5 py-1.5 text-xs font-semibold text-white hover:border-[#FFC93C]"
+          <div className="flex items-center gap-2 relative z-50">
+            <CallLink
+              phone={phoneDisplay}
+              whatsapp={whatsappDisplay}
+              ariaLabel="Call MY CONCRETE"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/60 px-2.5 min-h-[44px] min-w-[44px] text-xs font-semibold text-white hover:border-[#FFC93C] hover:text-[#FFC93C]"
             >
               <Phone className="w-3.5 h-3.5 text-[#FFC93C]" />
               <span>{t('callNow')}</span>
-            </a>
+            </CallLink>
             <button
               type="button"
               onClick={() => setLang(lang === 'en' ? 'kn' : 'en')}
@@ -689,13 +691,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <a
-                href={phoneHref}
-                className="flex items-center justify-center gap-2 rounded-lg border border-white/30 py-3 text-sm font-semibold text-white"
+              <CallLink
+                phone={phoneDisplay}
+                whatsapp={whatsappDisplay}
+                className="flex items-center justify-center gap-2 rounded-lg border border-white/30 min-h-[44px] py-3 text-sm font-semibold text-white hover:border-[#FFC93C]"
               >
                 <Phone className="w-4 h-4 text-[#FFC93C]" />
                 <span>Call Plant</span>
-              </a>
+              </CallLink>
               <a
                 href={whatsappHref}
                 target="_blank"
@@ -820,11 +823,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <span aria-hidden="true">&rarr;</span>
               </a>
             </p>
-            <p className="tabular-nums">
-              Phone: <a href={phoneHref} className="hover:text-white font-semibold">{phoneDisplay}</a>
-            </p>
+            <div className="tabular-nums flex flex-wrap items-center gap-2">
+              <span>Phone:</span>
+              <CallLink
+                phone={phoneDisplay}
+                whatsapp={whatsappDisplay}
+                className="hover:text-[#FFC93C] font-semibold inline-flex items-center min-h-[44px] md:min-h-0"
+              >
+                {phoneDisplay}
+              </CallLink>
+              <CopyPhoneButton
+                phone={phoneDisplay}
+                className="hidden md:inline-flex border-white/25 text-slate-200 hover:border-[#FFC93C] hover:text-white"
+              />
+            </div>
             <p>
-              Email: <a href={`mailto:${emailDisplay}`} className="hover:text-white">{emailDisplay}</a>
+              Email:{' '}
+              <EmailLink
+                email={emailDisplay}
+                className="hover:text-[#FFC93C] inline-flex items-center min-h-[44px] md:min-h-0"
+              >
+                {emailDisplay}
+              </EmailLink>
             </p>
             <p className="text-emerald-300 font-medium">{biz?.workingHours}</p>
             <div className="pt-2 flex flex-wrap gap-3">
@@ -861,13 +881,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Desktop Floating Buttons */}
       <div className="hidden md:flex fixed right-5 bottom-6 z-30 flex-col items-end gap-2.5">
-        <a
-          href={phoneHref}
+        <CallLink
+          phone={phoneDisplay}
+          whatsapp={whatsappDisplay}
           className="inline-flex items-center gap-2 rounded-full bg-[#0F1F5C] text-white border border-white/20 px-4 py-2 text-xs font-semibold shadow-lg hover:bg-[#1F3FA8] transition-colors"
         >
           <Phone className="w-3.5 h-3.5 text-[#FFC93C]" />
-          <span>Call +91 73378 07372</span>
-        </a>
+          <span className="tabular-nums">Call {phoneDisplay}</span>
+        </CallLink>
         <a
           href={whatsappHref}
           target="_blank"
@@ -892,10 +913,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Sticky Bottom Bar */}
       <div className="md:hidden fixed inset-x-0 bottom-0 z-30 h-12 bg-[#0F1F5C] border-t border-white/15 grid grid-cols-3 text-xs font-semibold text-white">
-        <a href={phoneHref} className="flex items-center justify-center gap-1.5 border-r border-white/15">
+        <CallLink
+          phone={phoneDisplay}
+          whatsapp={whatsappDisplay}
+          className="flex items-center justify-center gap-1.5 border-r border-white/15 min-h-[44px] hover:bg-white/10"
+        >
           <Phone className="w-3.5 h-3.5 text-[#FFC93C]" />
           <span>{t('callNow')}</span>
-        </a>
+        </CallLink>
         <a
           href={whatsappHref}
           target="_blank"

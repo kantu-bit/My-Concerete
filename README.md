@@ -75,7 +75,74 @@ This application does **not** ship with any default or hardcoded admin password.
 
 ---
 
-## 4. Development & Production Commands
+## 4. How to set up notifications
+
+Every submission across **Book Delivery**, **Get Quote**, **Book Site/Plant Visit**, **Contact / Connect Now**, **Partner With Us**, **Careers**, and **Newsletter** is saved to the database first (`status = New`, unread badge in `/admin`) and then dispatches Email and WhatsApp alerts asynchronously with 3 automatic retries.
+
+Configure your secrets in `.env` (never commit `.env`), then verify live delivery inside **`/admin` → Settings → Notifications → Send test notification**.
+
+### A. Owner Email via Gmail App Password (Recommended)
+
+1. Sign in to the Google Account (`myconcretektl@gmail.com`) at `https://myaccount.google.com/security`.
+2. Ensure **2-Step Verification** is turned **ON**.
+3. Open **App passwords** (search `"App passwords"` in Google Account search), select app **Mail** (or enter `"MY CONCRETE Website"`), and click **Create**.
+4. Copy the 16-character App Password (spaces removed) into `.env`:
+   ```env
+   NOTIFY_EMAIL="myconcretektl@gmail.com"
+   SMTP_HOST="smtp.gmail.com"
+   SMTP_PORT="465"
+   SMTP_USER="myconcretektl@gmail.com"
+   SMTP_PASS="your16charapppassword"
+   SMTP_FROM="MY CONCRETE Dispatch <myconcretektl@gmail.com>"
+   ```
+5. *(Alternative: Resend HTTP API)* Instead of SMTP, set `RESEND_API_KEY` and verified sender `RESEND_FROM` in `.env`.
+
+### B. Owner WhatsApp via CallMeBot (Free & Fastest Setup)
+
+1. Save CallMeBot's official WhatsApp bot contact in your phone (`+91 73378 07372`): **`+34 644 71 81 99`** (verify current number at `https://www.callmebot.com/blog/free-api-whatsapp-messages/`).
+2. Send this exact WhatsApp message to that bot number from `+91 73378 07372`:
+   ```text
+   I allow callmebot to send me messages
+   ```
+3. Wait ~1 minute for the bot reply containing your personal `apikey`.
+4. Add to `.env`:
+   ```env
+   WHATSAPP_PROVIDER="callmebot"
+   OWNER_WHATSAPP="917337807372"
+   CALLMEBOT_PHONE="917337807372"
+   CALLMEBOT_APIKEY="your_callmebot_apikey"
+   ```
+   *(Optional)* Add a second owner/dispatch manager number via `OWNER_WHATSAPP_2="91XXXXXXXXXX"`. Note that with CallMeBot each receiving phone number must either activate its own bot key or use Cloud API / Twilio.
+
+### C. Owner WhatsApp via Meta WhatsApp Cloud API (Official Business API)
+
+1. Go to `https://developers.facebook.com/` → **My Apps** → **Create App** → choose **Other** → **Business**, then add the **WhatsApp** product.
+2. Under **WhatsApp → API Setup**, copy your **Phone Number ID** (`WHATSAPP_PHONE_ID`).
+3. Create a **System User** in **Meta Business Settings → System Users**, assign your WhatsApp Business Account with `whatsapp_business_messaging` permission, and generate a **Permanent Access Token** (`WHATSAPP_TOKEN`).
+4. Create and approve an **Utility** message template (e.g., `lead_alert` with body `{{1}}`) under **WhatsApp Manager → Message Templates** so outbound notifications work even outside the 24-hour customer service window.
+5. Add to `.env`:
+   ```env
+   WHATSAPP_PROVIDER="cloudapi"
+   OWNER_WHATSAPP="917337807372"
+   OWNER_WHATSAPP_2=""
+   WHATSAPP_PHONE_ID="your_phone_number_id"
+   WHATSAPP_TOKEN="your_permanent_access_token"
+   WHATSAPP_TEMPLATE_NAME="lead_alert"
+   ```
+
+### D. Twilio WhatsApp or Disable Background WhatsApp
+
+- For Twilio: set `WHATSAPP_PROVIDER="twilio"`, `TWILIO_SID`, `TWILIO_TOKEN`, and `TWILIO_FROM="whatsapp:+14155238886"`.
+- To skip background WhatsApp silently (still keeping the instant customer 1-tap `wa.me/917337807372` button on every form): set `WHATSAPP_PROVIDER="none"`.
+
+### E. Testing & Monitoring in Admin
+
+- Open `/admin` → **Settings → Notifications** to change `NOTIFY_EMAIL`, `OWNER_WHATSAPP`, `OWNER_WHATSAPP_2`, `WHATSAPP_PROVIDER`, or pause/enable individual channels, and click **Send test notification** to verify live delivery.
+- Every booking, quote, visit, enquiry, and newsletter subscriber displays live **Email** and **WhatsApp** delivery status badges (`sent` / `failed` / `skipped`) with a **Resend notification** button and full log in **Quotes & Inbox → Notification Outbox Log**.
+
+---
+
+## 5. Development & Production Commands
 
 ```bash
 # Development server (Express API + Vite SPA on port 3000)

@@ -87,6 +87,8 @@ export default function App() {
 
             <Route path="/admin/login" element={<AdminDashboardPage mode="login" />} />
             <Route path="/admin/users" element={<AdminDashboardPage initialTab="users" />} />
+            <Route path="/admin/locations" element={<AdminDashboardPage initialTab="locations" />} />
+            <Route path="/admin/settings" element={<AdminDashboardPage initialTab="settings" />} />
             <Route path="/admin" element={<AdminDashboardPage />} />
             <Route path="*" element={<HomePage />} />
           </Routes>

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, Mail, MessageCircle } from 'lucide-react';
+import { useApp } from '../context/AppContext.tsx';
 import { readApiJson } from '../utils/api.ts';
+import { buildWhatsAppUrl } from '../utils/documents.ts';
 
 interface ConnectFormProps {
-  type?: 'contact' | 'partner';
+  type?: 'contact' | 'partner' | 'careers';
   title?: string;
   compact?: boolean;
   onSuccess?: () => void;
@@ -15,6 +17,9 @@ export function ConnectForm({
   compact = false,
   onSuccess,
 }: ConnectFormProps) {
+  const { data, lang } = useApp();
+  const biz = data?.businessConfig;
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -26,10 +31,15 @@ export function ConnectForm({
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const [submittedActions, setSubmittedActions] = useState<{
+    whatsappUrl: string;
+    mailtoUrl: string;
+  } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setStatusMsg(null);
+    setSubmittedActions(null);
     if (!/^[6-9]\d{9}$/.test(phone.trim())) {
       setStatusMsg({ kind: 'err', text: 'Please enter a valid 10-digit Indian mobile number.' });
       return;
@@ -41,6 +51,19 @@ export function ConnectForm({
 
     const finalCity =
       cityChoice === 'Other' ? customCity.trim() || 'Other (Near Kotihal)' : cityChoice;
+    const labelText =
+      type === 'partner' ? 'PARTNER' : type === 'careers' ? 'CAREERS APPLICATION' : 'CONTACT';
+    const summaryText = [
+      `*NEW ${labelText} ENQUIRY*`,
+      `Name: ${name.trim()}`,
+      `Mobile: +91 ${phone.trim()}`,
+      email.trim() ? `Email: ${email.trim()}` : null,
+      `City: ${finalCity}`,
+      companyOrRole.trim() ? `Role/Firm: ${companyOrRole.trim()}` : null,
+      `Message: ${message.trim()}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     try {
       setSubmitting(true);
@@ -56,13 +79,23 @@ export function ConnectForm({
           companyOrRole: companyOrRole.trim(),
           message: message.trim(),
           consent,
+          language: lang,
           website_url: websiteUrl,
         }),
       });
-      await readApiJson<{ ok: boolean }>(res);
+      const json = await readApiJson<{ ok: boolean; enquiryCode?: string; whatsappUrl?: string }>(res);
+      const ownerEmail = biz?.email || 'myconcretektl@gmail.com';
+      const ownerWhatsapp = biz?.whatsapp || biz?.phone || '+91 73378 07372';
+      const refId = json.enquiryCode || '';
+      setSubmittedActions({
+        whatsappUrl: json.whatsappUrl || buildWhatsAppUrl(ownerWhatsapp, summaryText),
+        mailtoUrl: `mailto:${ownerEmail}?subject=${encodeURIComponent(
+          `MY CONCRETE ${labelText} Enquiry ${refId} – ${name.trim()}`
+        )}&body=${encodeURIComponent(summaryText)}`,
+      });
       setStatusMsg({
         kind: 'ok',
-        text: 'Thank you! Your enquiry has been sent to our Kotihal dispatch desk.',
+        text: `${refId ? `Reference ID: ${refId} · ` : ''}Thank you! Your enquiry has been received. Our team will call you shortly.`,
       });
       setName('');
       setPhone('');
@@ -168,16 +201,22 @@ export function ConnectForm({
         </div>
       )}
 
-      {type === 'partner' && (
+      {(type === 'partner' || type === 'careers') && (
         <div>
           <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">
-            Partnership Category (Contractor / Mixer Owner / Material Supplier)
+            {type === 'careers'
+              ? 'Role Applying For (Plant Operator / Mixer Driver / Pump Operator / QC)'
+              : 'Partnership Category (Contractor / Mixer Owner / Material Supplier)'}
           </label>
           <input
             type="text"
             value={companyOrRole}
             onChange={(e) => setCompanyOrRole(e.target.value)}
-            placeholder="e.g., Civil Contractor / Fleet Partner"
+            placeholder={
+              type === 'careers'
+                ? 'e.g., Transit Mixer Driver / Batching Plant Operator'
+                : 'e.g., Civil Contractor / Fleet Partner'
+            }
             className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm focus:border-[#1F3FA8] focus:outline-none"
           />
         </div>
@@ -211,18 +250,42 @@ export function ConnectForm({
 
       {statusMsg && (
         <div
-          className={`flex items-center gap-2 rounded-xl p-3 text-sm ${
+          className={`space-y-2 rounded-xl p-3 text-sm ${
             statusMsg.kind === 'ok'
               ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800'
               : 'bg-red-50 text-red-800 dark:bg-red-950/50 dark:text-red-200 border border-red-200 dark:border-red-800'
           }`}
         >
-          {statusMsg.kind === 'ok' ? (
-            <CheckCircle2 className="w-4 h-4 shrink-0" />
-          ) : (
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div className="flex items-center gap-2">
+            {statusMsg.kind === 'ok' ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 shrink-0" />
+            )}
+            <span>{statusMsg.text}</span>
+          </div>
+          {statusMsg.kind === 'ok' && submittedActions && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <a
+                href={submittedActions.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#16A34A] hover:brightness-110 text-white px-3.5 py-1.5 text-xs font-semibold"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>Send on WhatsApp</span>
+              </a>
+              <a
+                href={submittedActions.mailtoUrl}
+                target="_top"
+                rel="noopener"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#D92B25] hover:brightness-110 text-white px-3.5 py-1.5 text-xs font-semibold"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Send via Email</span>
+              </a>
+            </div>
           )}
-          <span>{statusMsg.text}</span>
         </div>
       )}
 
@@ -232,7 +295,11 @@ export function ConnectForm({
         className="btn-orange-pill px-6 py-2.5 text-sm disabled:opacity-60 whitespace-nowrap"
       >
         {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-        {type === 'partner' ? 'Submit Partnership Enquiry' : 'Send Enquiry'}
+        {type === 'partner'
+          ? 'Submit Partnership Enquiry'
+          : type === 'careers'
+            ? 'Submit Application'
+            : 'Send Enquiry'}
       </button>
     </form>
   );

@@ -5,6 +5,7 @@ import type {
   CustomerSegmentConfig,
   HeroSlide,
   MediaItem,
+  PlantLocation,
   ProductItem,
   ProjectItem,
   SchedulingConfig,
@@ -17,6 +18,7 @@ type Theme = 'light' | 'dark';
 
 interface BootstrapData {
   businessConfig: BusinessConfig;
+  plantLocations: PlantLocation[];
   schedulingConfig: SchedulingConfig;
   heroSlides: HeroSlide[];
   statsItems: StatItem[];

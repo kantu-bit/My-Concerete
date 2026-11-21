@@ -1,7 +1,13 @@
 import crypto from 'node:crypto';
 import type { Request, Response, NextFunction } from 'express';
-import nodemailer from 'nodemailer';
 import { db } from './db.ts';
+import {
+  cleanWhatsappNumber,
+  getEffectiveNotificationConfig,
+  getNotificationEnvPresence,
+  sendEmailDetailed,
+  sendWhatsAppToOwners,
+} from './notifications.ts';
 
 export const ADMIN_COOKIE_NAME = 'mc_admin_session';
 export const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -141,15 +147,15 @@ export function haversineDistanceKm(
 // Simple sliding-window in-memory rate limiter
 const rateBuckets = new Map<string, number[]>();
 
-export function rateLimit(maxRequests: number, windowMs: number) {
+export function rateLimit(maxRequests: number, windowMs: number, bucketPrefix?: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     const ip = getClientIp(req);
-    const key = `${req.path}:${ip}`;
+    const key = `${bucketPrefix || req.path}:${ip}`;
     const now = Date.now();
     const recent = (rateBuckets.get(key) || []).filter((ts) => now - ts < windowMs);
     if (recent.length >= maxRequests) {
       res.status(429).json({
-        error: 'Too many requests. Please wait a moment before trying again.',
+        error: 'Too many submissions from this IP. Please try again later or call +91 73378 07372.',
       });
       return;
     }
@@ -270,19 +276,47 @@ export function setSetting(key: string, value: unknown): void {
   ).run(key, JSON.stringify(value));
 }
 
-function tryLogEmail(
-  recipient: string,
-  subject: string,
-  loggedPreview: string,
-  deliveryMode: 'smtp' | 'logged'
-): void {
-  try {
-    db.prepare(
-      `INSERT INTO email_logs (recipient, subject, body_preview, delivery_mode) VALUES (?, ?, ?, ?)`
-    ).run(recipient, subject, loggedPreview, deliveryMode);
-  } catch {
-    // Do not fail email notification if database logging is temporarily unavailable
-  }
+export { cleanWhatsappNumber };
+
+export function getNotificationChannelStatus(): {
+  emailConfigured: boolean;
+  emailProvider: 'smtp' | 'resend' | 'none';
+  whatsappAutoConfigured: boolean;
+  whatsappProvider: 'cloudapi' | 'twilio' | 'callmebot' | 'none';
+  ownerEmail: string;
+  ownerWhatsapp: string;
+  ownerWhatsapp2: string;
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
+} {
+  const cfg = getEffectiveNotificationConfig();
+  const env = getNotificationEnvPresence();
+  const emailProvider: 'smtp' | 'resend' | 'none' = env.smtpConfigured
+    ? 'smtp'
+    : env.resendConfigured
+      ? 'resend'
+      : 'none';
+
+  const whatsappAutoConfigured =
+    cfg.whatsappProvider === 'cloudapi'
+      ? env.cloudapiConfigured
+      : cfg.whatsappProvider === 'twilio'
+        ? env.twilioConfigured
+        : cfg.whatsappProvider === 'callmebot'
+          ? env.callmebotConfigured
+          : false;
+
+  return {
+    emailConfigured: emailProvider !== 'none',
+    emailProvider,
+    whatsappAutoConfigured,
+    whatsappProvider: cfg.whatsappProvider,
+    ownerEmail: cfg.notifyEmail,
+    ownerWhatsapp: cfg.ownerWhatsapp,
+    ownerWhatsapp2: cfg.ownerWhatsapp2,
+    emailEnabled: cfg.emailEnabled,
+    whatsappEnabled: cfg.whatsappEnabled,
+  };
 }
 
 export async function sendNotificationEmail(
@@ -290,42 +324,31 @@ export async function sendNotificationEmail(
   subject: string,
   textBody: string,
   auditPreviewOverride?: string
-): Promise<'smtp' | 'logged'> {
-  const loggedPreview = (auditPreviewOverride ?? textBody).slice(0, 600);
-
-  if (!recipient || !recipient.includes('@') || recipient.includes('[EMAIL]')) {
-    tryLogEmail(recipient || 'unconfigured', subject, loggedPreview, 'logged');
-    return 'logged';
-  }
-
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const port = Number(process.env.SMTP_PORT || '587');
-  const from = process.env.SMTP_FROM || 'MY CONCRETE Dispatch <noreply@myconcrete-rmc.example>';
-
-  if (host && user && pass) {
-    try {
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure: port === 465,
-        auth: { user, pass },
-      });
-      await transporter.sendMail({
-        from,
-        to: recipient,
-        subject,
-        text: textBody,
-      });
-      tryLogEmail(recipient, subject, loggedPreview, 'smtp');
-      return 'smtp';
-    } catch {
-      tryLogEmail(recipient, subject, loggedPreview, 'logged');
-      return 'logged';
-    }
-  }
-
-  tryLogEmail(recipient, subject, loggedPreview, 'logged');
+): Promise<'smtp' | 'resend' | 'logged'> {
+  const res = await sendEmailDetailed({
+    to: recipient,
+    subject,
+    text: textBody,
+    auditPreviewOverride,
+  });
+  if (res.provider === 'smtp' && res.ok) return 'smtp';
+  if (res.provider === 'resend' && res.ok) return 'resend';
   return 'logged';
+}
+
+export async function sendOwnerWhatsAppAlert(
+  message: string,
+  targetOverride?: string
+): Promise<'cloudapi' | 'callmebot' | 'twilio' | 'link_only'> {
+  const cfg = getEffectiveNotificationConfig();
+  const res = await sendWhatsAppToOwners({
+    message,
+    cfg: targetOverride
+      ? { ...cfg, ownerWhatsapp: cleanWhatsappNumber(targetOverride) || cfg.ownerWhatsapp }
+      : cfg,
+  });
+  if (res.ok && res.status === 'sent' && res.provider !== 'none') {
+    return res.provider;
+  }
+  return 'link_only';
 }

@@ -25,6 +25,7 @@ interface BookingDraft {
   pumpType: 'none' | 'line' | 'boom';
   deliveryDate: string;
   slotId: string;
+  dispatchPlantId?: string;
   siteAddress: string;
   landmark: string;
   city: string;
@@ -39,6 +40,8 @@ interface BookingDraft {
 
 interface EstimateResponse {
   unitType?: string;
+  dispatchPlantId?: string;
+  dispatchPlantName?: string;
   distanceKm: number;
   withinServiceRadius: boolean;
   serviceRadiusKm: number;
@@ -74,13 +77,56 @@ const TOWN_PRESETS = [
 ];
 
 export function BookDeliveryPage() {
-  const { data } = useApp();
+  const { data, lang } = useApp();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const products = (data?.products || []).filter((p) => p.isOffered);
   const biz = data?.businessConfig;
   const scheduling = data?.schedulingConfig;
+  const plantLocations =
+    data?.plantLocations && data.plantLocations.length > 0
+      ? data.plantLocations
+      : biz
+        ? [
+            {
+              id: 'kotihal',
+              name: biz.businessName,
+              shortLabel: 'Kotihal',
+              address: biz.address,
+              city: 'Ranebennur',
+              postalCode: '581119',
+              lat: biz.plantLat,
+              lng: biz.plantLng,
+              phone: biz.phone || '+91 73378 07372',
+              whatsapp: biz.whatsapp || biz.phone || '+91 73378 07372',
+              hours: biz.workingHours || 'Open 24 Hours (All Days)',
+              serviceRadiusKm: biz.serviceRadiusKm || 50,
+              googleMapsUrl:
+                biz.googleMapsUrl ||
+                `https://www.google.com/maps/dir/?api=1&destination=${biz.plantLat},${biz.plantLng}`,
+              pinColor: 'blue' as const,
+              isPrimary: true,
+            },
+            {
+              id: 'davangere',
+              name: 'MY CONCRETE – Davangere Unit',
+              shortLabel: 'Davangere',
+              address: 'Davangere, Karnataka 577001',
+              city: 'Davangere',
+              postalCode: '577001',
+              lat: 14.4644,
+              lng: 75.9218,
+              phone: '+91 73378 07372',
+              whatsapp: '+91 73378 07372',
+              hours: 'Open 24 Hours (All Days)',
+              serviceRadiusKm: 50,
+              googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+              pinColor: 'red' as const,
+              isPrimary: false,
+            },
+          ]
+        : [];
 
   const [step, setStep] = useState(1);
   const [websiteUrl, setWebsiteUrl] = useState(''); // honeypot
@@ -101,7 +147,11 @@ export function BookDeliveryPage() {
     const saved = localStorage.getItem(DRAFT_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved) as BookingDraft;
+        const parsed = JSON.parse(saved) as BookingDraft;
+        return {
+          ...parsed,
+          dispatchPlantId: parsed.dispatchPlantId || 'kotihal',
+        };
       } catch {
         // ignore invalid draft
       }
@@ -115,6 +165,7 @@ export function BookDeliveryPage() {
       pumpType: 'none',
       deliveryDate: '',
       slotId: 'slot-08-10',
+      dispatchPlantId: 'kotihal',
       siteAddress: '',
       landmark: '',
       city: 'Ranebennur',
@@ -131,17 +182,18 @@ export function BookDeliveryPage() {
   useDocumentMeta({
     title: 'Book 24/7 Concrete & Brick Delivery | MY CONCRETE Ranebennur & Davangere',
     description:
-      'Schedule 24/7 Ready-Mix Concrete or Cement Bricks delivery across Ranebennur and Davangere with 2-hour day/night windows and Kotihal map distance preview.',
+      'Schedule 24/7 Ready-Mix Concrete or Cement Bricks delivery from Kotihal or Davangere across Ranebennur & Davangere with 2-hour day/night windows.',
   });
 
-  // Apply URL query parameters from Volume/Brick Calculator or Product pages
+  // Apply URL query parameters from Volume/Brick Calculator, Plant Map, or Product pages
   useEffect(() => {
     const qQty = Number(searchParams.get('qty'));
     const qProduct = searchParams.get('product');
     const qGrade = searchParams.get('grade');
     const qUsage = searchParams.get('usage');
+    const qPlant = searchParams.get('plant');
 
-    if (!qQty && !qProduct && !qGrade && !qUsage) return;
+    if (!qQty && !qProduct && !qGrade && !qUsage && !qPlant) return;
 
     setDraft((prev) => {
       const next = { ...prev };
@@ -149,6 +201,7 @@ export function BookDeliveryPage() {
       if (qProduct) next.productSlug = qProduct;
       if (qGrade) next.grade = qGrade;
       if (qUsage) next.usageType = qUsage;
+      if (qPlant) next.dispatchPlantId = qPlant;
       if (qProduct === 'cement-bricks') {
         next.pumpType = 'none';
         next.slumpMm = 'Per Piece';
@@ -157,9 +210,11 @@ export function BookDeliveryPage() {
     });
   }, [searchParams]);
 
-  // Initialize default open date & valid slot once scheduling config loads
+  // Initialize default open date & valid slot once scheduling config loads (and reset stale past draft dates)
   useEffect(() => {
-    if (scheduling && !draft.deliveryDate) {
+    if (!scheduling) return;
+    const todayIsoLocal = new Date().toISOString().slice(0, 10);
+    if (!draft.deliveryDate || draft.deliveryDate < todayIsoLocal) {
       const fallbackSlot = scheduling.slots.find((s) => s.id === draft.slotId)?.id || scheduling.slots[4]?.id || scheduling.slots[0]?.id || 'slot-08-10';
       setDraft((prev) => ({
         ...prev,
@@ -177,6 +232,11 @@ export function BookDeliveryPage() {
   const selectedProduct =
     products.find((p) => p.slug === draft.productSlug) || products[0];
   const isPieces = selectedProduct?.unitType === 'pieces';
+  const selectedPlant =
+    plantLocations.find((p) => p.id === draft.dispatchPlantId) ||
+    plantLocations.find((p) => p.isPrimary) ||
+    plantLocations[0];
+  const activePlantId = selectedPlant?.id || draft.dispatchPlantId || 'kotihal';
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -232,6 +292,7 @@ export function BookDeliveryPage() {
         pumpType: isPieces ? 'none' : draft.pumpType,
         siteLat: draft.siteLat,
         siteLng: draft.siteLng,
+        plantId: activePlantId,
       }),
     })
       .then((r) => parseJsonResponse<EstimateResponse & { error?: string }>(r))
@@ -239,7 +300,16 @@ export function BookDeliveryPage() {
         if (isJson && data && !data.error) setEstimate(data);
       })
       .catch(() => {});
-  }, [draft.productSlug, draft.grade, draft.quantityM3, draft.pumpType, draft.siteLat, draft.siteLng, isPieces]);
+  }, [
+    draft.productSlug,
+    draft.grade,
+    draft.quantityM3,
+    draft.pumpType,
+    draft.siteLat,
+    draft.siteLng,
+    activePlantId,
+    isPieces,
+  ]);
 
   function validateStep(current: number): string | null {
     if (current === 1) {
@@ -303,8 +373,10 @@ export function BookDeliveryPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...draft,
+          dispatchPlantId: activePlantId,
           pumpType: isPieces ? 'none' : draft.pumpType,
           slumpMm: isPieces ? 'Per Piece' : draft.slumpMm,
+          language: lang,
           allowWaitlist,
           website_url: websiteUrl,
         }),
@@ -405,7 +477,7 @@ export function BookDeliveryPage() {
         {/* STEP 1 */}
         {step === 1 && (
           <div className="space-y-5">
-            <h2 className="font-display font-bold text-xl">1. Select Product &amp; Grade / Size</h2>
+            <h2 className="font-display font-bold text-xl">1. Select Product, Grade &amp; Dispatch Unit</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">
@@ -445,6 +517,46 @@ export function BookDeliveryPage() {
                 </select>
               </div>
             </div>
+
+            {plantLocations.length > 0 && (
+              <div>
+                <label className="block text-xs font-medium text-[var(--muted)] mb-2">
+                  Delivery from (Dispatch Plant) *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {plantLocations.map((loc) => {
+                    const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
+                    const isSelected = activePlantId === loc.id;
+                    return (
+                      <button
+                        key={loc.id}
+                        type="button"
+                        onClick={() => setDraft({ ...draft, dispatchPlantId: loc.id })}
+                        className={`text-left rounded-xl border p-3.5 transition-colors flex items-start gap-2.5 cursor-pointer ${
+                          isSelected
+                            ? 'border-[#D92B25] bg-[#FFF0EF] dark:bg-[#1F3FA8]'
+                            : 'border-[#D7E4FF] dark:border-[#264096]'
+                        }`}
+                      >
+                        <span
+                          className={`inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-full text-[10px] font-extrabold text-white mt-0.5 ${
+                            isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                          }`}
+                        >
+                          {isRed ? <MapPin className="w-3.5 h-3.5" /> : 'MC'}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-[#0F1F5C] dark:text-white">
+                            {loc.shortLabel || loc.city} Unit
+                          </p>
+                          <p className="text-xs text-[var(--muted)] truncate">{loc.address}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -641,6 +753,30 @@ export function BookDeliveryPage() {
             <h2 className="font-display font-bold text-xl">4. Delivery Site Address &amp; Map Pin</h2>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-5 space-y-4">
+                {plantLocations.length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">
+                      Delivery from
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {plantLocations.map((loc) => (
+                        <button
+                          key={loc.id}
+                          type="button"
+                          onClick={() => setDraft({ ...draft, dispatchPlantId: loc.id })}
+                          className={`px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors cursor-pointer ${
+                            activePlantId === loc.id
+                              ? 'border-[#D92B25] bg-[#FFF0EF] dark:bg-[#1F3FA8] text-[#0F1F5C] dark:text-white'
+                              : 'border-[#D7E4FF] dark:border-[#264096]'
+                          }`}
+                        >
+                          {loc.shortLabel || loc.city}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">
                     Quick Town Preset
@@ -713,7 +849,10 @@ export function BookDeliveryPage() {
                   <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-1.5 text-xs">
                     <p className="font-semibold text-sm flex items-center gap-1.5">
                       <MapPin className="w-4 h-4 text-[#D92B25]" />
-                      <span className="tabular-nums">Distance from Kotihal Plant: {estimate.distanceKm} km</span>
+                      <span className="tabular-nums">
+                        Distance from {estimate.dispatchPlantName || selectedPlant?.shortLabel || 'Kotihal'} Plant:{' '}
+                        {estimate.distanceKm} km
+                      </span>
                     </p>
                     <p className="text-[var(--muted)] tabular-nums">
                       Indicative Delivery Estimate: ₹{estimate.estimatedDeliveryFee.toLocaleString('en-IN')}
@@ -733,11 +872,13 @@ export function BookDeliveryPage() {
                 </p>
                 {biz && (
                   <PlantMap
-                    plantLat={biz.plantLat}
-                    plantLng={biz.plantLng}
-                    serviceRadiusKm={biz.serviceRadiusKm}
-                    plantName={biz.businessName}
-                    plantAddress={biz.address}
+                    plantLat={selectedPlant?.lat || biz.plantLat}
+                    plantLng={selectedPlant?.lng || biz.plantLng}
+                    serviceRadiusKm={selectedPlant?.serviceRadiusKm || biz.serviceRadiusKm}
+                    plantName={selectedPlant?.name || biz.businessName}
+                    plantAddress={selectedPlant?.address || biz.address}
+                    locations={plantLocations}
+                    activePlantId={activePlantId}
                     selectable
                     siteLat={draft.siteLat}
                     siteLng={draft.siteLng}
@@ -848,6 +989,7 @@ export function BookDeliveryPage() {
                   <strong>24/7 Slot:</strong>{' '}
                   {scheduling?.slots.find((s) => s.id === draft.slotId)?.label || draft.slotId}
                 </p>
+                <p><strong>Delivery From:</strong> {selectedPlant?.name || 'Kotihal Plant'}</p>
                 <p><strong>Site:</strong> {draft.siteAddress}, {draft.city}</p>
                 <p className="tabular-nums"><strong>Contact:</strong> {draft.customerName} (+91 {draft.phone})</p>
               </div>
@@ -864,7 +1006,9 @@ export function BookDeliveryPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-300">Delivery (~{estimate.distanceKm} km from Kotihal)</span>
+                    <span className="text-slate-300">
+                      Delivery (~{estimate.distanceKm} km from {estimate.dispatchPlantName || selectedPlant?.shortLabel || 'Kotihal'})
+                    </span>
                     <span className="font-mono tabular-nums">
                       ₹{estimate.estimatedDeliveryFee.toLocaleString('en-IN')}
                     </span>

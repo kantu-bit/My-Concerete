@@ -37,6 +37,44 @@ export const DEFAULT_BUSINESS_CONFIG = {
   boomPumpCharge: 11500,
 };
 
+export const DEFAULT_PLANT_LOCATIONS = [
+  {
+    id: 'kotihal',
+    name: 'MY CONCRETE – Readymix Concrete Unit (Kotihal)',
+    shortLabel: 'Kotihal',
+    address:
+      'FM66+2X6, Kotihal, Karnataka 581119 (Inside Lucky Artificial Sand Industry Premises, near Ranebennur)',
+    city: 'Kotihal, Ranebennur',
+    postalCode: '581119',
+    lat: 14.4607,
+    lng: 75.6633,
+    phone: '+91 73378 07372',
+    whatsapp: '+91 73378 07372',
+    hours: 'Open 24 Hours (All Days)',
+    serviceRadiusKm: 50,
+    googleMapsUrl: 'https://share.google/oZzcrYosJ0JYw2tTn',
+    pinColor: 'blue' as const,
+    isPrimary: true,
+  },
+  {
+    id: 'davangere',
+    name: 'MY CONCRETE – Davangere Unit',
+    shortLabel: 'Davangere',
+    address: 'Davangere, Karnataka 577001',
+    city: 'Davangere',
+    postalCode: '577001',
+    lat: 14.4644,
+    lng: 75.9218,
+    phone: '+91 73378 07372',
+    whatsapp: '+91 73378 07372',
+    hours: 'Open 24 Hours (All Days)',
+    serviceRadiusKm: 50,
+    googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+    pinColor: 'red' as const,
+    isPrimary: false,
+  },
+];
+
 export const DEFAULT_SCHEDULING_CONFIG = {
   closedDays: [] as number[], // Open 24/7 all days by default
   holidays: [] as string[],
@@ -1245,6 +1283,7 @@ export function seedDatabase(): void {
 
   const insertSetting = db.prepare(`INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)`);
   insertSetting.run('businessConfig', JSON.stringify(DEFAULT_BUSINESS_CONFIG));
+  insertSetting.run('plantLocations', JSON.stringify(DEFAULT_PLANT_LOCATIONS));
   insertSetting.run('schedulingConfig', JSON.stringify(DEFAULT_SCHEDULING_CONFIG));
   insertSetting.run('heroSlides', JSON.stringify(DEFAULT_HERO_SLIDES));
   insertSetting.run('statsItems', JSON.stringify(DEFAULT_STATS));
@@ -1447,13 +1486,24 @@ export function seedDatabase(): void {
   const adminPass = process.env.ADMIN_PASSWORD || '';
   if (adminEmail && adminPass.length >= 8) {
     const existingAdmin = db
-      .prepare(`SELECT id FROM admin_users WHERE lower(email) = ?`)
-      .get(adminEmail);
+      .prepare(
+        `SELECT id, password_hash, must_change_password, last_login_at FROM admin_users WHERE lower(email) = ?`
+      )
+      .get(adminEmail) as
+      | { id: number; password_hash: string; must_change_password: number; last_login_at: string }
+      | undefined;
     if (!existingAdmin) {
       const hash = bcrypt.hashSync(adminPass, 12);
       db.prepare(
         `INSERT INTO admin_users (email, name, password_hash, role, must_change_password) VALUES (?, 'Owner', ?, 'owner', 1)`
       ).run(adminEmail, hash);
+    } else if (
+      existingAdmin.must_change_password === 1 &&
+      !existingAdmin.last_login_at &&
+      !bcrypt.compareSync(adminPass, existingAdmin.password_hash)
+    ) {
+      const hash = bcrypt.hashSync(adminPass, 12);
+      db.prepare(`UPDATE admin_users SET password_hash = ? WHERE id = ?`).run(hash, existingAdmin.id);
     }
   }
 }

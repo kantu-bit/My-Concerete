@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CheckCircle2, Mail, MapPin, Phone } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Mail, MapPin, Navigation, Phone } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { ConnectForm } from '../components/ConnectForm.tsx';
 import { VisualPlate } from '../components/VisualPlate.tsx';
 import { PlantMap } from '../components/PlantMap.tsx';
+import { CallLink, CopyPhoneButton, EmailLink } from '../components/ContactLinks.tsx';
+import { buildWhatsAppUrl } from '../utils/documents.ts';
 
 export function PartnerPage() {
   useDocumentMeta({
@@ -254,17 +256,60 @@ export function BlogDetailPage() {
 export function ContactPage() {
   const { data } = useApp();
   const biz = data?.businessConfig;
+  const plantLocations =
+    data?.plantLocations && data.plantLocations.length > 0
+      ? data.plantLocations
+      : biz
+        ? [
+            {
+              id: 'kotihal',
+              name: biz.businessName,
+              shortLabel: 'Kotihal',
+              address: biz.address,
+              city: 'Ranebennur',
+              postalCode: '581119',
+              lat: biz.plantLat,
+              lng: biz.plantLng,
+              phone: biz.phone || '+91 73378 07372',
+              whatsapp: biz.whatsapp || biz.phone || '+91 73378 07372',
+              hours: biz.workingHours || 'Open 24 Hours (All Days)',
+              serviceRadiusKm: biz.serviceRadiusKm || 50,
+              googleMapsUrl:
+                biz.googleMapsUrl ||
+                `https://www.google.com/maps/dir/?api=1&destination=${biz.plantLat},${biz.plantLng}`,
+              pinColor: 'blue' as const,
+              isPrimary: true,
+            },
+            {
+              id: 'davangere',
+              name: 'MY CONCRETE – Davangere Unit',
+              shortLabel: 'Davangere',
+              address: 'Davangere, Karnataka 577001',
+              city: 'Davangere',
+              postalCode: '577001',
+              lat: 14.4644,
+              lng: 75.9218,
+              phone: '+91 73378 07372',
+              whatsapp: '+91 73378 07372',
+              hours: 'Open 24 Hours (All Days)',
+              serviceRadiusKm: 50,
+              googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+              pinColor: 'red' as const,
+              isPrimary: false,
+            },
+          ]
+        : [];
 
   useDocumentMeta({
     title: 'Contact Us | MY CONCRETE Kotihal, Ranebennur & Davangere',
     description:
-      'Contact MY CONCRETE – Readymix Concrete Unit at Kotihal (near Ranebennur). Open 24 hours on +91 73378 07372 and myconcretektl@gmail.com.',
+      'Contact MY CONCRETE – Readymix Concrete Unit at Kotihal & Davangere. Open 24 hours on +91 73378 07372 and myconcretektl@gmail.com.',
   });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-10">
       <div className="space-y-2">
-        <p className="text-xs font-semibold text-[#D92B25]">24/7 Kotihal Dispatch Desk</p>
+        <p className="text-xs font-semibold text-[#D92B25]">24/7 Kotihal &amp; Davangere Dispatch Desk</p>
         <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-[#0F1F5C] dark:text-white">
           Contact MY CONCRETE
         </h1>
@@ -273,36 +318,100 @@ export function ContactPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-5 space-y-6">
           <div className="warm-card p-6 space-y-4 text-sm">
-            <div className="flex items-start gap-3">
-              <MapPin className="w-5 h-5 text-[#D92B25] shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-semibold text-[#0F1F5C] dark:text-white">Plant Address</p>
-                <p className="text-[var(--muted)]">{biz?.address}</p>
+            <div className="space-y-3">
+              {plantLocations.map((loc, idx) => {
+                const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
+                const locDirections =
+                  loc.googleMapsUrl ||
+                  `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+                return (
+                  <div
+                    key={loc.id}
+                    className={`flex items-start gap-3 ${
+                      idx > 0 ? 'pt-3 border-t border-[#D7E4FF] dark:border-[#264096]' : ''
+                    }`}
+                  >
+                    <span
+                      className={`inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-full text-[10px] font-extrabold text-white mt-0.5 ${
+                        isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                      }`}
+                    >
+                      {isRed ? <MapPin className="w-3.5 h-3.5" /> : 'MC'}
+                    </span>
+                    <div className="space-y-1">
+                      <p className="font-semibold text-[#0F1F5C] dark:text-white">{loc.name}</p>
+                      <p className="text-[var(--muted)]">{loc.address}</p>
+                      <div className="flex flex-wrap items-center gap-3 text-xs pt-0.5">
+                        <CallLink
+                          phone={loc.phone || biz?.phone || '+91 73378 07372'}
+                          whatsapp={loc.whatsapp || loc.phone || biz?.whatsapp || '+91 73378 07372'}
+                          className="tabular-nums font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                        >
+                          {loc.phone}
+                        </CallLink>
+                        <a
+                          href={locDirections}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                        >
+                          <span>Open in Google Maps</span>
+                          <span aria-hidden="true">&rarr;</span>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="space-y-2 pt-2 border-t border-[#D7E4FF] dark:border-[#264096]">
+              <CallLink
+                phone={biz?.phone || '+91 73378 07372'}
+                whatsapp={biz?.whatsapp || biz?.phone || '+91 73378 07372'}
+                className="flex items-start gap-3 min-h-[44px] py-1 text-left group hover:text-[#1F3FA8] dark:hover:text-[#FFC93C] transition-colors"
+              >
+                <Phone className="w-5 h-5 text-[#D92B25] shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-[#0F1F5C] dark:text-white group-hover:text-[#D92B25] transition-colors">
+                    Dispatch Phone / WhatsApp
+                  </p>
+                  <p className="tabular-nums text-[var(--muted)] group-hover:underline">
+                    {biz?.phone || '+91 73378 07372'}
+                  </p>
+                </div>
+              </CallLink>
+              <div className="pl-8 flex flex-wrap items-center gap-2">
+                <CopyPhoneButton
+                  phone={biz?.phone || '+91 73378 07372'}
+                  className="border-[#D7E4FF] dark:border-[#264096] text-[#0F1F5C] dark:text-white hover:border-[#1F3FA8]"
+                />
                 <a
-                  href={biz?.googleMapsUrl || 'https://share.google/oZzcrYosJ0JYw2tTn'}
+                  href={buildWhatsAppUrl(
+                    biz?.whatsapp || biz?.phone || '+91 73378 07372',
+                    'Hi MY CONCRETE, I would like to enquire about ready-mix concrete.'
+                  )}
                   target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline pt-0.5"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] hover:bg-[#15803D] text-white px-2.5 py-1 text-xs font-semibold transition-colors"
                 >
-                  <span>Open in Google Maps</span>
-                  <span aria-hidden="true">&rarr;</span>
+                  <span>WhatsApp</span>
                 </a>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <Phone className="w-5 h-5 text-[#D92B25] shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-[#0F1F5C] dark:text-white">Dispatch Phone / WhatsApp</p>
-                <p className="tabular-nums text-[var(--muted)]">{biz?.phone}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
+            <EmailLink
+              email={biz?.email || 'myconcretektl@gmail.com'}
+              className="flex items-start gap-3 min-h-[44px] py-1 text-left group hover:text-[#1F3FA8] dark:hover:text-[#FFC93C] transition-colors"
+            >
               <Mail className="w-5 h-5 text-[#D92B25] shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-[#0F1F5C] dark:text-white">Email</p>
-                <p className="text-[var(--muted)]">{biz?.email}</p>
+                <p className="font-semibold text-[#0F1F5C] dark:text-white group-hover:text-[#D92B25] transition-colors">
+                  Email
+                </p>
+                <p className="text-[var(--muted)] group-hover:underline">
+                  {biz?.email || 'myconcretektl@gmail.com'}
+                </p>
               </div>
-            </div>
+            </EmailLink>
             <div className="pt-2 border-t border-[#D7E4FF] dark:border-[#264096] flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
                 Working Hours: {biz?.workingHours}
@@ -339,6 +448,7 @@ export function ContactPage() {
               serviceRadiusKm={biz.serviceRadiusKm}
               plantName={biz.businessName}
               plantAddress={biz.address}
+              locations={plantLocations}
               googleMapsUrl={biz.googleMapsUrl}
               heightClass="h-64"
             />
@@ -349,6 +459,88 @@ export function ContactPage() {
           <ConnectForm title="Send an Enquiry" />
         </div>
       </div>
+
+      {/* Embedded Google Maps for Each Dispatch Plant */}
+      {plantLocations.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold text-[#D92B25]">Google Maps Locations</p>
+            <h2 className="font-display font-bold text-2xl text-[#0F1F5C] dark:text-white">
+              Our Dispatch Units on Google Maps
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {plantLocations.map((loc) => {
+              const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
+              const locDirections =
+                loc.googleMapsUrl ||
+                `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+              const embedSrc = `https://maps.google.com/maps?q=${encodeURIComponent(
+                `${loc.lat},${loc.lng}`
+              )}&z=14&output=embed`;
+              return (
+                <div key={loc.id} className="warm-card overflow-hidden flex flex-col">
+                  <div className="p-4 border-b border-[#D7E4FF] dark:border-[#264096] flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <span
+                        className={`inline-flex items-center justify-center shrink-0 w-7 h-7 rounded-full text-[11px] font-extrabold text-white mt-0.5 ${
+                          isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                        }`}
+                      >
+                        {isRed ? <MapPin className="w-4 h-4" /> : 'MC'}
+                      </span>
+                      <div>
+                        <h3 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
+                          {loc.name}
+                        </h3>
+                        <p className="text-xs text-[var(--muted)] mt-0.5">{loc.address}</p>
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
+                          {loc.hours}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="w-full h-64 bg-[#EAF1FF] dark:bg-[#152972]">
+                    <iframe
+                      title={`Google Map – ${loc.name}`}
+                      src={embedSrc}
+                      className="w-full h-full border-0"
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  </div>
+                  <div className="p-4 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <CallLink
+                      phone={loc.phone}
+                      whatsapp={loc.whatsapp || loc.phone}
+                      className="tabular-nums font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                    >
+                      {loc.phone}
+                    </CallLink>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={locDirections}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full border border-[#D7E4FF] dark:border-[#264096] px-3 py-1.5 font-semibold hover:border-[#D92B25]"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        <span>Get Directions</span>
+                      </a>
+                      <Link
+                        to={`/book?plant=${encodeURIComponent(loc.id)}`}
+                        className="btn-orange-pill px-3.5 py-1.5 text-xs"
+                      >
+                        Book Delivery
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

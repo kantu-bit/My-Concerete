@@ -46,7 +46,8 @@ import {
 import { useApp } from '../context/AppContext.tsx';
 import { VisualPlate, type VisualVariant } from '../components/VisualPlate.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
-import { buildWhatsAppUrl, cleanPhoneDigits } from '../utils/documents.ts';
+import { buildWhatsAppUrl } from '../utils/documents.ts';
+import { CallLink, CopyPhoneButton } from '../components/ContactLinks.tsx';
 import type { CustomerSegmentConfig } from '../types/index.ts';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -222,13 +223,18 @@ export function CustomersOverviewPage() {
             >
               <span>{t('getQuote')}</span>
             </Link>
-            <a
-              href={`tel:+${cleanPhoneDigits(phoneDisplay)}`}
-              className="inline-flex items-center gap-2 rounded-[6px] bg-white/10 hover:bg-white/20 px-4 py-3 text-sm font-semibold text-[#FFC93C] transition-colors"
+            <CallLink
+              phone={phoneDisplay}
+              whatsapp={whatsappDisplay}
+              className="inline-flex items-center gap-2 rounded-[6px] bg-white/10 hover:bg-white/20 px-4 min-h-[44px] py-2.5 text-sm font-semibold text-[#FFC93C] transition-colors"
             >
               <Phone className="w-4 h-4" />
               <span className="tabular-nums">{phoneDisplay}</span>
-            </a>
+            </CallLink>
+            <CopyPhoneButton
+              phone={phoneDisplay}
+              className="hidden md:inline-flex border-white/30 text-white hover:border-[#FFC93C] min-h-[44px] px-3"
+            />
             <a
               href={buildWhatsAppUrl(whatsappDisplay, 'Hi MY CONCRETE, I would like to enquire about ready-mix concrete.')}
               target="_blank"
@@ -785,13 +791,19 @@ export function CustomersPage() {
             >
               <span>{t('getQuote')}</span>
             </Link>
-            <a
-              href={`tel:+${cleanPhoneDigits(phoneDisplay)}`}
-              className="inline-flex items-center gap-2 rounded-[6px] bg-white/10 hover:bg-white/20 px-4 py-3 text-sm font-semibold text-[#FFC93C] transition-colors"
+            <CallLink
+              phone={phoneDisplay}
+              whatsapp={whatsappDisplay}
+              whatsappMessage={`Hi MY CONCRETE, I would like to enquire about ready-mix concrete for a ${current.label} project.`}
+              className="inline-flex items-center gap-2 rounded-[6px] bg-white/10 hover:bg-white/20 px-4 min-h-[44px] py-2.5 text-sm font-semibold text-[#FFC93C] transition-colors"
             >
               <Phone className="w-4 h-4" />
               <span className="tabular-nums">{phoneDisplay}</span>
-            </a>
+            </CallLink>
+            <CopyPhoneButton
+              phone={phoneDisplay}
+              className="hidden md:inline-flex border-white/30 text-white hover:border-[#FFC93C] min-h-[44px] px-3"
+            />
             <a
               href={buildWhatsAppUrl(
                 whatsappDisplay,

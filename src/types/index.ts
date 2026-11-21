@@ -1,3 +1,21 @@
+export interface PlantLocation {
+  id: string;
+  name: string;
+  shortLabel: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  lat: number;
+  lng: number;
+  phone: string;
+  whatsapp?: string;
+  hours: string;
+  serviceRadiusKm: number;
+  googleMapsUrl: string;
+  pinColor?: 'blue' | 'red';
+  isPrimary?: boolean;
+}
+
 export interface BusinessConfig {
   businessName: string;
   shortName: string;
@@ -188,6 +206,8 @@ export interface BookingRecord {
   site_lat: number;
   site_lng: number;
   distance_km: number;
+  dispatch_plant?: string;
+  dispatch_plant_name?: string;
   estimated_concrete_amount: number;
   estimated_delivery_fee: number;
   estimated_pump_fee: number;
@@ -198,8 +218,26 @@ export interface BookingRecord {
   gst_number: string;
   notes: string;
   status: string;
+  language?: string;
+  is_read?: number;
+  email_status?: string;
+  email_error?: string;
+  whatsapp_status?: string;
+  whatsapp_error?: string;
+  notified_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface NotificationConfig {
+  notifyEmail: string;
+  ownerWhatsapp: string;
+  ownerWhatsapp2: string;
+  whatsappProvider: 'cloudapi' | 'twilio' | 'callmebot' | 'none';
+  whatsappTemplateName: string;
+  emailEnabled: boolean;
+  whatsappEnabled: boolean;
+  customerAckEnabled: boolean;
 }
 
 export interface CustomerApplication {

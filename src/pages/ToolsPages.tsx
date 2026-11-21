@@ -14,6 +14,7 @@ import {
 import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { PlantMap } from '../components/PlantMap.tsx';
+import { CallLink } from '../components/ContactLinks.tsx';
 
 type ElementType = 'slab' | 'beam' | 'column' | 'footing' | 'wall';
 type UnitType = 'ft' | 'm';
@@ -811,11 +812,54 @@ export function GradeHelperPage() {
 export function PlantLocatorPage() {
   const { data } = useApp();
   const biz = data?.businessConfig;
+  const plantLocations =
+    data?.plantLocations && data.plantLocations.length > 0
+      ? data.plantLocations
+      : biz
+        ? [
+            {
+              id: 'kotihal',
+              name: biz.businessName,
+              shortLabel: 'Kotihal',
+              address: biz.address,
+              city: 'Ranebennur',
+              postalCode: '581119',
+              lat: biz.plantLat,
+              lng: biz.plantLng,
+              phone: biz.phone || '+91 73378 07372',
+              whatsapp: biz.whatsapp || biz.phone || '+91 73378 07372',
+              hours: biz.workingHours || 'Open 24 Hours (All Days)',
+              serviceRadiusKm: biz.serviceRadiusKm || 50,
+              googleMapsUrl:
+                biz.googleMapsUrl ||
+                `https://www.google.com/maps/dir/?api=1&destination=${biz.plantLat},${biz.plantLng}`,
+              pinColor: 'blue' as const,
+              isPrimary: true,
+            },
+            {
+              id: 'davangere',
+              name: 'MY CONCRETE – Davangere Unit',
+              shortLabel: 'Davangere',
+              address: 'Davangere, Karnataka 577001',
+              city: 'Davangere',
+              postalCode: '577001',
+              lat: 14.4644,
+              lng: 75.9218,
+              phone: '+91 73378 07372',
+              whatsapp: '+91 73378 07372',
+              hours: 'Open 24 Hours (All Days)',
+              serviceRadiusKm: 50,
+              googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+              pinColor: 'red' as const,
+              isPrimary: false,
+            },
+          ]
+        : [];
 
   useDocumentMeta({
-    title: 'Plant Locator & Delivery Coverage | MY CONCRETE Kotihal',
+    title: 'Plant Locator & Delivery Coverage | MY CONCRETE Kotihal & Davangere',
     description:
-      'Interactive OpenStreetMap locator for MY CONCRETE batching unit at FM66+2X6, Kotihal (near Ranebennur), serving Ranebennur & Davangere.',
+      'Interactive OpenStreetMap locator for MY CONCRETE batching units at Kotihal (near Ranebennur) and Davangere.',
   });
 
   const directionsUrl =
@@ -826,7 +870,7 @@ export function PlantLocatorPage() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold text-[#D92B25]">Kotihal Dispatch Coordinates</p>
+          <p className="text-xs font-semibold text-[#D92B25]">Kotihal &amp; Davangere Dispatch Units</p>
           <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-[#0F1F5C] dark:text-white">
             Plant Locator &amp; Service Radius
           </h1>
@@ -838,7 +882,7 @@ export function PlantLocatorPage() {
           className="btn-orange-pill px-5 py-2.5 text-sm self-start"
         >
           <Navigation className="w-4 h-4" />
-          <span>Open Google Directions</span>
+          <span>Directions to Kotihal Plant</span>
         </a>
       </div>
 
@@ -849,21 +893,71 @@ export function PlantLocatorPage() {
           serviceRadiusKm={biz.serviceRadiusKm}
           plantName={biz.businessName}
           plantAddress={biz.address}
+          locations={plantLocations}
           googleMapsUrl={biz.googleMapsUrl}
           heightClass="h-[460px]"
         />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {plantLocations.map((loc) => {
+          const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
+          const locDirections =
+            loc.googleMapsUrl ||
+            `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+          return (
+            <div key={loc.id} className="warm-card p-5 space-y-3">
+              <div className="flex items-start gap-2.5">
+                <span
+                  className={`inline-flex items-center justify-center shrink-0 w-7 h-7 rounded-full text-[11px] font-extrabold text-white mt-0.5 ${
+                    isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                  }`}
+                >
+                  {isRed ? <MapPin className="w-4 h-4" /> : 'MC'}
+                </span>
+                <div>
+                  <h2 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
+                    {loc.name}
+                  </h2>
+                  <p className="text-sm text-[var(--muted)] mt-0.5">{loc.address}</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-xs pl-9">
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{loc.hours}</span>
+                <span className="text-[var(--muted)] tabular-nums">Radius: {loc.serviceRadiusKm} km</span>
+                <CallLink
+                  phone={loc.phone}
+                  whatsapp={loc.whatsapp || loc.phone}
+                  className="tabular-nums font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                >
+                  {loc.phone}
+                </CallLink>
+              </div>
+              <div className="flex flex-wrap gap-2.5 pl-9 pt-1">
+                <a
+                  href={locDirections}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 rounded-full border border-[#D7E4FF] dark:border-[#264096] px-3.5 py-1.5 text-xs font-semibold hover:border-[#D92B25]"
+                >
+                  <Navigation className="w-3.5 h-3.5" />
+                  <span>Get Directions</span>
+                </a>
+                <Link
+                  to={`/book?plant=${encodeURIComponent(loc.id)}`}
+                  className="btn-orange-pill px-4 py-1.5 text-xs"
+                >
+                  Book Delivery from this plant
+                </Link>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="warm-card p-5 space-y-1">
-          <p className="text-xs text-[var(--muted)]">Plant Address</p>
-          <p className="text-sm font-medium flex items-start gap-2">
-            <MapPin className="w-4 h-4 text-[#D92B25] mt-0.5 shrink-0" />
-            <span>{biz?.address}</span>
-          </p>
-        </div>
-        <div className="warm-card p-5 space-y-1">
-          <p className="text-xs text-[var(--muted)]">Delivery Coverage</p>
+          <p className="text-xs text-[var(--muted)]">Combined Delivery Coverage</p>
           <p className="text-sm font-semibold tabular-nums">
             Within {biz?.serviceRadiusKm || 50} km (Ranebennur, Davangere, Harihar, Byadgi, Haveri)
           </p>

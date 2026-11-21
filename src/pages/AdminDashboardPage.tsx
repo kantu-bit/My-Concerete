@@ -1,32 +1,46 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  AlertCircle,
+  Ban,
   BarChart3,
   CalendarDays,
+  Check,
   CheckCircle2,
   Download,
+  Eye,
   FileText,
   Image as ImageIcon,
   Inbox,
   KeyRound,
   Layers,
   LogOut,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Pencil,
   Plus,
+  RefreshCw,
   Settings,
   ShieldCheck,
   Sliders,
   Trash2,
   UserPlus,
   Users,
+  X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
+import { CallLink, EmailLink } from '../components/ContactLinks.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
+import { buildWhatsAppUrl } from '../utils/documents.ts';
 import { FRIENDLY_API_ERROR, parseJsonResponse } from '../utils/api.ts';
 import type {
   BookingRecord,
   BusinessConfig,
   CustomerSegmentConfig,
   HeroSlide,
+  NotificationConfig,
+  PlantLocation,
   ProductItem,
   SchedulingConfig,
   StatItem,
@@ -37,10 +51,12 @@ export type AdminTab =
   | 'bookings'
   | 'inbox'
   | 'products'
+  | 'locations'
   | 'scheduling'
   | 'cms'
   | 'gallery'
   | 'customers'
+  | 'settings'
   | 'users'
   | 'security';
 
@@ -73,8 +89,45 @@ interface AdminLoginLogRow {
   created_at: string;
 }
 
+interface SiteVisitRecord {
+  id: number;
+  visit_code: string;
+  visit_type: string;
+  preferred_date: string;
+  preferred_time: string;
+  location: string;
+  customer_name: string;
+  phone: string;
+  email: string;
+  notes: string;
+  status: string;
+  language?: string;
+  is_read?: number;
+  email_status?: string;
+  email_error?: string;
+  whatsapp_status?: string;
+  whatsapp_error?: string;
+  notified_at?: string;
+  created_at: string;
+}
+
 interface AdminOverviewData {
   role: 'owner' | 'staff';
+  supabaseSync?: {
+    configured: boolean;
+    usingServiceRole: boolean;
+    canRead: boolean;
+    bookingCountFromSupabase?: number;
+    hint?: string;
+  };
+  unreadCounts?: {
+    bookings: number;
+    quotes: number;
+    siteVisits: number;
+    enquiries: number;
+    subscribers: number;
+    total: number;
+  };
   analytics?: {
     totalBookings: number;
     totalVolumeM3: number;
@@ -86,10 +139,29 @@ interface AdminOverviewData {
   };
   bookings: BookingRecord[];
   quotes?: Array<Record<string, unknown>>;
-  siteVisits?: Array<Record<string, unknown>>;
+  siteVisits?: SiteVisitRecord[];
   enquiries?: Array<Record<string, unknown>>;
   subscribers?: Array<Record<string, unknown>>;
   emailLogs?: Array<Record<string, unknown>>;
+  notificationConfig?: NotificationConfig;
+  envCredentialStatus?: {
+    smtpConfigured: boolean;
+    resendConfigured: boolean;
+    cloudapiConfigured: boolean;
+    twilioConfigured: boolean;
+    callmebotConfigured: boolean;
+  };
+  notificationStatus?: {
+    emailConfigured: boolean;
+    emailProvider: 'smtp' | 'resend' | 'none';
+    whatsappAutoConfigured: boolean;
+    whatsappProvider: 'cloudapi' | 'twilio' | 'callmebot' | 'none';
+    ownerEmail: string;
+    ownerWhatsapp: string;
+    ownerWhatsapp2?: string;
+    emailEnabled?: boolean;
+    whatsappEnabled?: boolean;
+  };
   customers?: Array<{
     name: string;
     phone: string;
@@ -98,6 +170,41 @@ interface AdminOverviewData {
     totalOrders: number;
     totalM3: number;
   }>;
+}
+
+function getDeliveryStatusClass(status: string): string {
+  switch (status) {
+    case 'sent':
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800';
+    case 'failed':
+      return 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 border-red-300 dark:border-red-800';
+    case 'skipped':
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800';
+    default:
+      return 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border-slate-300 dark:border-slate-700';
+  }
+}
+
+function getStatusBadgeClass(status: string): string {
+  switch (status) {
+    case 'confirmed':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 border-blue-200 dark:border-blue-800';
+    case 'approved':
+      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800';
+    case 'dispatched':
+      return 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-200 border-amber-200 dark:border-amber-800';
+    case 'completed':
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800';
+    case 'waitlisted':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200 border-purple-200 dark:border-purple-800';
+    case 'cancelled':
+    case 'rejected':
+      return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 border-red-200 dark:border-red-800';
+    case 'scheduled':
+      return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200 border-sky-200 dark:border-sky-800';
+    default:
+      return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700';
+  }
 }
 
 const IDLE_LIMIT_MS = 30 * 60 * 1000;
@@ -147,8 +254,26 @@ export function AdminDashboardPage({
   const [cpError, setCpError] = useState<string | null>(null);
   const [cpBusy, setCpBusy] = useState(false);
 
-  const [tab, setTab] = useState<AdminTab>(initialTab || 'analytics');
+  const tabFromUrl = searchParams.get('tab') as AdminTab | null;
+  const [tab, setTab] = useState<AdminTab>(initialTab || tabFromUrl || 'analytics');
   const [overview, setOverview] = useState<AdminOverviewData | null>(null);
+  const [notifForm, setNotifForm] = useState<NotificationConfig>({
+    notifyEmail: 'myconcretektl@gmail.com',
+    ownerWhatsapp: '917337807372',
+    ownerWhatsapp2: '',
+    whatsappProvider: 'none',
+    whatsappTemplateName: '',
+    emailEnabled: true,
+    whatsappEnabled: true,
+    customerAckEnabled: true,
+  });
+  const [notifSaving, setNotifSaving] = useState(false);
+  const [notifTesting, setNotifTesting] = useState(false);
+  const [notifTestResult, setNotifTestResult] = useState<{
+    emailResult?: { ok: boolean; status: string; provider: string; error?: string };
+    whatsappResult?: { ok: boolean; status: string; provider: string; error?: string };
+  } | null>(null);
+  const [resendingKey, setResendingKey] = useState<string | null>(null);
   const [usersData, setUsersData] = useState<{
     users: AdminUserRow[];
     loginLogs: AdminLoginLogRow[];
@@ -163,10 +288,65 @@ export function AdminDashboardPage({
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
+  const [appointmentsSubTab, setAppointmentsSubTab] = useState<'deliveries' | 'visits'>('deliveries');
   const [bookingFilter, setBookingFilter] = useState('all');
   const [bookingSearch, setBookingSearch] = useState('');
+  const [viewingBooking, setViewingBooking] = useState<BookingRecord | null>(null);
+  const [editingBooking, setEditingBooking] = useState<BookingRecord | null>(null);
+  const [editBookingForm, setEditBookingForm] = useState({
+    customerName: '',
+    phone: '',
+    email: '',
+    gstNumber: '',
+    grade: '',
+    quantityM3: 1,
+    usageType: '',
+    slumpMm: '',
+    pumpType: 'none' as 'none' | 'line' | 'boom',
+    deliveryDate: '',
+    slotId: '',
+    siteAddress: '',
+    landmark: '',
+    city: '',
+    notes: '',
+    status: 'confirmed',
+  });
+  const [bookingActionBusy, setBookingActionBusy] = useState(false);
+  const [bookingModalError, setBookingModalError] = useState<string | null>(null);
+  const [confirmCancelBookingId, setConfirmCancelBookingId] = useState<number | null>(null);
+
+  const [editingVisit, setEditingVisit] = useState<SiteVisitRecord | null>(null);
+  const [editVisitForm, setEditVisitForm] = useState({
+    customerName: '',
+    phone: '',
+    email: '',
+    preferredDate: '',
+    preferredTime: '',
+    location: '',
+    notes: '',
+    status: 'scheduled',
+  });
+  const [visitActionBusy, setVisitActionBusy] = useState(false);
+  const [visitModalError, setVisitModalError] = useState<string | null>(null);
+  const [confirmCancelVisitId, setConfirmCancelVisitId] = useState<number | null>(null);
 
   const [bizForm, setBizForm] = useState<BusinessConfig | null>(null);
+  const [locationsForm, setLocationsForm] = useState<PlantLocation[]>([]);
+  const [newLocationForm, setNewLocationForm] = useState({
+    name: '',
+    shortLabel: '',
+    address: '',
+    city: '',
+    postalCode: '',
+    lat: '14.4644',
+    lng: '75.9218',
+    phone: '+91 73378 07372',
+    whatsapp: '+91 73378 07372',
+    hours: 'Open 24 Hours (All Days)',
+    serviceRadiusKm: '50',
+    googleMapsUrl: '',
+    pinColor: 'red' as 'blue' | 'red',
+  });
   const [schedForm, setSchedForm] = useState<SchedulingConfig | null>(null);
   const [heroForm, setHeroForm] = useState<HeroSlide[]>([]);
   const [statsForm, setStatsForm] = useState<StatItem[]>([]);
@@ -226,8 +406,22 @@ export function AdminDashboardPage({
   }, [initialTab]);
 
   useEffect(() => {
+    if (!viewingBooking && !editingBooking && !editingVisit) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setViewingBooking(null);
+        setEditingBooking(null);
+        setEditingVisit(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [viewingBooking, editingBooking, editingVisit]);
+
+  useEffect(() => {
     if (siteData) {
       setBizForm(siteData.businessConfig);
+      setLocationsForm(siteData.plantLocations || []);
       setSchedForm(siteData.schedulingConfig);
       setHeroForm(siteData.heroSlides);
       setStatsForm(siteData.statsItems);
@@ -306,7 +500,12 @@ export function AdminDashboardPage({
       }
       if (res.ok) {
         const { data: json } = await parseJsonResponse<AdminOverviewData>(res);
-        if (json) setOverview(json);
+        if (json) {
+          setOverview(json);
+          if (json.notificationConfig) {
+            setNotifForm(json.notificationConfig);
+          }
+        }
       }
     } finally {
       setLoading(false);
@@ -572,16 +771,179 @@ export function AdminDashboardPage({
     }
   }
 
-  async function updateBooking(id: number, payload: Record<string, string>) {
-    const res = await fetch(`/api/admin/bookings/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(payload),
+  function openEditBookingModal(b: BookingRecord) {
+    setBookingModalError(null);
+    setConfirmCancelBookingId(null);
+    setEditingBooking(b);
+    setEditBookingForm({
+      customerName: b.customer_name || '',
+      phone: b.phone || '',
+      email: b.email || '',
+      gstNumber: b.gst_number || '',
+      grade: b.grade || '',
+      quantityM3: Number(b.quantity_m3 || 1),
+      usageType: b.usage_type || '',
+      slumpMm: b.slump_mm || '',
+      pumpType: (b.pump_type || 'none') as 'none' | 'line' | 'boom',
+      deliveryDate: b.delivery_date || '',
+      slotId: b.slot_id || '',
+      siteAddress: b.site_address || '',
+      landmark: b.landmark || '',
+      city: b.city || '',
+      notes: b.notes || '',
+      status: b.status || 'confirmed',
     });
-    if (handleApiAuthFailure(res)) return;
-    await fetchOverview();
-    showToast('Booking updated.');
+  }
+
+  function openEditVisitModal(sv: SiteVisitRecord) {
+    setVisitModalError(null);
+    setConfirmCancelVisitId(null);
+    setEditingVisit(sv);
+    setEditVisitForm({
+      customerName: sv.customer_name || '',
+      phone: sv.phone || '',
+      email: sv.email || '',
+      preferredDate: sv.preferred_date || '',
+      preferredTime: sv.preferred_time || '',
+      location: sv.location || '',
+      notes: sv.notes || '',
+      status: sv.status || 'scheduled',
+    });
+  }
+
+  async function updateBooking(id: number, payload: Record<string, unknown>) {
+    setBookingActionBusy(true);
+    try {
+      const res = await fetch(`/api/admin/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      if (handleApiAuthFailure(res)) return false;
+      const { data: json, isJson } = await parseJsonResponse<{
+        error?: string;
+        booking?: BookingRecord;
+        supabaseUpdated?: boolean;
+      }>(res);
+      if (!isJson || !json) {
+        showToast(FRIENDLY_API_ERROR);
+        return false;
+      }
+      if (!res.ok) {
+        showToast(json.error || 'Could not update booking.');
+        return false;
+      }
+      if (json.booking && viewingBooking?.id === id) {
+        setViewingBooking(json.booking);
+      }
+      setConfirmCancelBookingId(null);
+      await fetchOverview();
+      showToast(
+        payload.status === 'cancelled'
+          ? 'Appointment cancelled.'
+          : json.supabaseUpdated
+            ? 'Booking updated & synced.'
+            : 'Booking updated.'
+      );
+      return true;
+    } finally {
+      setBookingActionBusy(false);
+    }
+  }
+
+  async function saveBookingEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingBooking) return;
+    setBookingModalError(null);
+    setBookingActionBusy(true);
+    try {
+      const res = await fetch(`/api/admin/bookings/${editingBooking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...editBookingForm,
+          quantityM3: Number(editBookingForm.quantityM3),
+        }),
+      });
+      if (handleApiAuthFailure(res)) return;
+      const { data: json, isJson } = await parseJsonResponse<{
+        error?: string;
+        booking?: BookingRecord;
+        supabaseUpdated?: boolean;
+      }>(res);
+      if (!isJson || !json) {
+        setBookingModalError(FRIENDLY_API_ERROR);
+        return;
+      }
+      if (!res.ok) {
+        setBookingModalError(json.error || 'Unable to save booking changes.');
+        return;
+      }
+      if (json.booking && viewingBooking?.id === editingBooking.id) {
+        setViewingBooking(json.booking);
+      }
+      setEditingBooking(null);
+      await fetchOverview();
+      showToast(json.supabaseUpdated ? 'Appointment saved & synced to Supabase.' : 'Appointment changes saved.');
+    } finally {
+      setBookingActionBusy(false);
+    }
+  }
+
+  async function updateSiteVisit(id: number, payload: Record<string, unknown>) {
+    setVisitActionBusy(true);
+    try {
+      const res = await fetch(`/api/admin/site-visits/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      if (handleApiAuthFailure(res)) return false;
+      const { data: json, isJson } = await parseJsonResponse<{ error?: string }>(res);
+      if (!isJson || !json || !res.ok) {
+        showToast(json?.error || 'Could not update site visit.');
+        return false;
+      }
+      setConfirmCancelVisitId(null);
+      await fetchOverview();
+      showToast(payload.status === 'cancelled' ? 'Visit cancelled.' : 'Visit updated.');
+      return true;
+    } finally {
+      setVisitActionBusy(false);
+    }
+  }
+
+  async function saveSiteVisitEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingVisit) return;
+    setVisitModalError(null);
+    setVisitActionBusy(true);
+    try {
+      const res = await fetch(`/api/admin/site-visits/${editingVisit.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(editVisitForm),
+      });
+      if (handleApiAuthFailure(res)) return;
+      const { data: json, isJson } = await parseJsonResponse<{ error?: string }>(res);
+      if (!isJson || !json) {
+        setVisitModalError(FRIENDLY_API_ERROR);
+        return;
+      }
+      if (!res.ok) {
+        setVisitModalError(json.error || 'Unable to update site visit.');
+        return;
+      }
+      setEditingVisit(null);
+      await fetchOverview();
+      showToast('Site visit updated.');
+    } finally {
+      setVisitActionBusy(false);
+    }
   }
 
   async function saveSetting(key: string, value: unknown) {
@@ -606,6 +968,109 @@ export function AdminDashboardPage({
     if (handleApiAuthFailure(res)) return;
     await refreshBootstrap();
     showToast(`Saved ${p.name}`);
+  }
+
+  async function markLeadRead(
+    kind: 'booking' | 'quote' | 'visit' | 'enquiry' | 'newsletter',
+    id: number,
+    isRead = true
+  ) {
+    if (!id) return;
+    const res = await fetch('/api/admin/leads/mark-read', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ kind, id, isRead }),
+    });
+    if (handleApiAuthFailure(res)) return;
+    if (res.ok) {
+      await fetchOverview();
+    }
+  }
+
+  async function resendLeadNotification(
+    kind: 'booking' | 'quote' | 'visit' | 'enquiry' | 'newsletter',
+    id: number
+  ) {
+    const key = `${kind}:${id}`;
+    setResendingKey(key);
+    try {
+      const res = await fetch('/api/admin/notifications/resend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ kind, id }),
+      });
+      if (handleApiAuthFailure(res)) return;
+      const { data: json } = await parseJsonResponse<{
+        emailResult?: { status: string; error?: string };
+        whatsappResult?: { status: string; error?: string };
+        error?: string;
+      }>(res);
+      if (!res.ok) {
+        showToast(json?.error || 'Could not resend notification.');
+        return;
+      }
+      await fetchOverview();
+      showToast(
+        `Notification resend: Email=${json?.emailResult?.status || 'done'}, WhatsApp=${json?.whatsappResult?.status || 'done'}`
+      );
+    } finally {
+      setResendingKey(null);
+    }
+  }
+
+  async function saveNotificationSettings(e: React.FormEvent) {
+    e.preventDefault();
+    setNotifSaving(true);
+    try {
+      const res = await fetch('/api/admin/notification-settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(notifForm),
+      });
+      if (handleApiAuthFailure(res)) return;
+      const { data: json } = await parseJsonResponse<{
+        error?: string;
+        config?: NotificationConfig;
+      }>(res);
+      if (!res.ok) {
+        showToast(json?.error || 'Unable to save notification settings.');
+        return;
+      }
+      if (json?.config) setNotifForm(json.config);
+      await fetchOverview();
+      showToast('Notification settings saved.');
+    } finally {
+      setNotifSaving(false);
+    }
+  }
+
+  async function sendTestNotification() {
+    setNotifTesting(true);
+    setNotifTestResult(null);
+    try {
+      const res = await fetch('/api/admin/notifications/test', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (handleApiAuthFailure(res)) return;
+      const { data: json } = await parseJsonResponse<{
+        error?: string;
+        emailResult?: { ok: boolean; status: string; provider: string; error?: string };
+        whatsappResult?: { ok: boolean; status: string; provider: string; error?: string };
+      }>(res);
+      if (!res.ok || !json) {
+        showToast(json?.error || 'Test notification failed.');
+        return;
+      }
+      setNotifTestResult(json);
+      await fetchOverview();
+      showToast('Test notification dispatched.');
+    } finally {
+      setNotifTesting(false);
+    }
   }
 
   function exportCustomersCsv() {
@@ -941,23 +1406,54 @@ export function AdminDashboardPage({
       !q ||
       b.booking_code.toLowerCase().includes(q) ||
       b.customer_name.toLowerCase().includes(q) ||
-      b.phone.includes(q);
+      b.phone.includes(q) ||
+      b.city.toLowerCase().includes(q) ||
+      b.grade.toLowerCase().includes(q);
     return matchesStatus && matchesSearch;
   });
 
-  const ownerNavItems: Array<{ id: AdminTab; label: string; icon: React.ReactNode }> = [
+  const unreadBookingsCount =
+    (overview?.unreadCounts?.bookings || 0) + (overview?.unreadCounts?.siteVisits || 0);
+  const unreadInboxCount =
+    (overview?.unreadCounts?.quotes || 0) +
+    (overview?.unreadCounts?.enquiries || 0) +
+    (overview?.unreadCounts?.subscribers || 0);
+
+  const ownerNavItems: Array<{
+    id: AdminTab;
+    label: string;
+    icon: React.ReactNode;
+    badge?: number;
+  }> = [
     { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="w-4 h-4" /> },
-    { id: 'bookings', label: 'Bookings & Dispatch', icon: <CalendarDays className="w-4 h-4" /> },
-    { id: 'inbox', label: 'Quotes & Inbox', icon: <Inbox className="w-4 h-4" /> },
+    {
+      id: 'bookings',
+      label: 'Bookings & Dispatch',
+      icon: <CalendarDays className="w-4 h-4" />,
+      badge: unreadBookingsCount,
+    },
+    {
+      id: 'inbox',
+      label: 'Quotes & Inbox',
+      icon: <Inbox className="w-4 h-4" />,
+      badge: unreadInboxCount,
+    },
     { id: 'products', label: 'Products & Rates', icon: <Layers className="w-4 h-4" /> },
+    { id: 'locations', label: 'Locations', icon: <MapPin className="w-4 h-4" /> },
     { id: 'scheduling', label: 'Plant, 24/7 Slots & Config', icon: <Sliders className="w-4 h-4" /> },
+    { id: 'settings', label: 'Settings → Notifications', icon: <Settings className="w-4 h-4" /> },
     { id: 'cms', label: 'CMS, Stats & Testimonials', icon: <FileText className="w-4 h-4" /> },
     { id: 'gallery', label: 'Media Gallery', icon: <ImageIcon className="w-4 h-4" /> },
     { id: 'customers', label: 'Customers & CSV', icon: <Users className="w-4 h-4" /> },
     { id: 'users', label: 'Staff & Security', icon: <ShieldCheck className="w-4 h-4" /> },
   ];
 
-  const staffNavItems: Array<{ id: AdminTab; label: string; icon: React.ReactNode }> = [
+  const staffNavItems: Array<{
+    id: AdminTab;
+    label: string;
+    icon: React.ReactNode;
+    badge?: number;
+  }> = [
     { id: 'bookings', label: 'Bookings & Dispatch', icon: <CalendarDays className="w-4 h-4" /> },
     { id: 'gallery', label: 'Media Gallery', icon: <ImageIcon className="w-4 h-4" /> },
     { id: 'security', label: 'Account Security', icon: <ShieldCheck className="w-4 h-4" /> },
@@ -988,18 +1484,33 @@ export function AdminDashboardPage({
                   setTab(item.id);
                   if (item.id === 'users' && isOwner) {
                     navigate('/admin/users', { replace: true });
-                  } else if (window.location.pathname === '/admin/users') {
+                  } else if (item.id === 'locations' && isOwner) {
+                    navigate('/admin/locations', { replace: true });
+                  } else if (item.id === 'settings' && isOwner) {
+                    navigate('/admin/settings', { replace: true });
+                  } else if (
+                    window.location.pathname === '/admin/users' ||
+                    window.location.pathname === '/admin/locations' ||
+                    window.location.pathname === '/admin/settings'
+                  ) {
                     navigate('/admin', { replace: true });
                   }
                 }}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors ${
                   tab === item.id
                     ? 'bg-[#D92B25] text-white'
                     : 'text-slate-300 hover:bg-[#1F3FA8] hover:text-white'
                 }`}
               >
-                {item.icon}
-                <span>{item.label}</span>
+                <span className="flex items-center gap-2.5">
+                  {item.icon}
+                  <span>{item.label}</span>
+                </span>
+                {item.badge && item.badge > 0 ? (
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-[#FFC93C] text-[#0F1F5C] text-[10px] font-extrabold tabular-nums">
+                    {item.badge}
+                  </span>
+                ) : null}
               </button>
             ))}
           </nav>
@@ -1129,95 +1640,456 @@ export function AdminDashboardPage({
         {tab === 'bookings' && overview && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-1.5">
-                {['all', 'confirmed', 'waitlisted', 'approved', 'dispatched', 'completed', 'cancelled', 'rejected'].map(
-                  (st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      onClick={() => setBookingFilter(st)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${
-                        bookingFilter === st
-                          ? 'bg-[#D92B25] text-white'
-                          : 'bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096]'
-                      }`}
-                    >
-                      {st}
-                    </button>
-                  )
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAppointmentsSubTab('deliveries')}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                    appointmentsSubTab === 'deliveries'
+                      ? 'bg-[#0F1F5C] text-white dark:bg-[#FFC93C] dark:text-[#0F1F5C]'
+                      : 'bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096]'
+                  }`}
+                >
+                  Delivery Bookings ({overview.bookings.length})
+                </button>
+                {isOwner && (
+                  <button
+                    type="button"
+                    onClick={() => setAppointmentsSubTab('visits')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                      appointmentsSubTab === 'visits'
+                        ? 'bg-[#0F1F5C] text-white dark:bg-[#FFC93C] dark:text-[#0F1F5C]'
+                        : 'bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096]'
+                    }`}
+                  >
+                    Site &amp; Plant Visits ({(overview.siteVisits || []).length})
+                  </button>
                 )}
               </div>
-              <input
-                type="search"
-                value={bookingSearch}
-                onChange={(e) => setBookingSearch(e.target.value)}
-                placeholder="Search ID, name or phone..."
-                className="rounded-full border border-[#D7E4FF] dark:border-[#264096] bg-[var(--surface)] px-4 py-1.5 text-xs w-60"
-              />
+
+              <button
+                type="button"
+                onClick={() => fetchOverview()}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--surface)] px-3.5 py-2 text-xs font-semibold hover:border-[#1F3FA8] disabled:opacity-60 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>{loading ? 'Refreshing...' : 'Refresh Database'}</span>
+              </button>
             </div>
 
-            <div className="warm-card overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-[var(--bg)] border-b border-[#D7E4FF] dark:border-[#264096] text-[var(--muted)]">
-                  <tr>
-                    <th className="px-4 py-3">Booking ID</th>
-                    <th className="px-4 py-3">Customer</th>
-                    <th className="px-4 py-3">Product / Qty</th>
-                    <th className="px-4 py-3">24/7 Schedule</th>
-                    <th className="px-4 py-3">Site</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#D7E4FF] dark:divide-[#264096]">
-                  {filteredBookings.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
-                        No matching bookings found.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredBookings.map((b) => (
-                      <tr key={b.id} className="hover:bg-[var(--bg)]/50">
-                        <td className="px-4 py-3 font-mono font-bold">{b.booking_code}</td>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold">{b.customer_name}</p>
-                          <p className="text-[var(--muted)] tabular-nums">{b.phone}</p>
-                        </td>
-                        <td className="px-4 py-3 tabular-nums">
-                          {b.grade} · {Number(b.quantity_m3).toLocaleString('en-IN')}{' '}
-                          {b.unit_type === 'pieces' ? 'pcs' : 'm³'}
-                          {b.unit_type !== 'pieces' ? ` (${b.pump_type})` : ''}
-                        </td>
-                        <td className="px-4 py-3 tabular-nums">
-                          <p>{b.delivery_date}</p>
-                          <p className="text-[var(--muted)]">{b.slot_label}</p>
-                        </td>
-                        <td className="px-4 py-3 max-w-[180px] truncate">
-                          {b.city} ({b.distance_km} km)
-                        </td>
-                        <td className="px-4 py-3 font-semibold uppercase">{b.status}</td>
-                        <td className="px-4 py-3 text-right">
-                          <select
-                            value={b.status}
-                            onChange={(e) => updateBooking(b.id, { status: e.target.value })}
-                            className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2 py-1 text-xs"
+            {overview.supabaseSync?.configured && !overview.supabaseSync.canRead && (
+              <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-3.5 flex items-start gap-2.5 text-xs text-amber-950 dark:text-amber-100">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-bold">Supabase Read/Update Key Needed for Cloud Retrieval</p>
+                  <p className="text-[11px] leading-relaxed">
+                    New website appointments automatically save into Supabase. To retrieve and edit existing Supabase records
+                    from this dashboard, add your server-side <code className="font-mono font-semibold">SUPABASE_SERVICE_ROLE_KEY</code>{' '}
+                    to <code className="font-mono">.env</code> and refresh. Currently displaying records stored in the plant database.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {appointmentsSubTab === 'deliveries' && (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {['all', 'confirmed', 'waitlisted', 'approved', 'dispatched', 'completed', 'cancelled', 'rejected'].map(
+                      (st) => {
+                        const count =
+                          st === 'all'
+                            ? overview.bookings.length
+                            : overview.bookings.filter((b) => b.status === st).length;
+                        return (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => setBookingFilter(st)}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize cursor-pointer ${
+                              bookingFilter === st
+                                ? 'bg-[#D92B25] text-white'
+                                : 'bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096]'
+                            }`}
                           >
-                            <option value="confirmed">Confirmed</option>
-                            <option value="waitlisted">Waitlisted</option>
-                            <option value="approved">Approved</option>
-                            <option value="dispatched">Dispatched</option>
-                            <option value="completed">Completed</option>
-                            <option value="rejected">Rejected</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
+                            {st} ({count})
+                          </button>
+                        );
+                      }
+                    )}
+                  </div>
+                  <input
+                    type="search"
+                    value={bookingSearch}
+                    onChange={(e) => setBookingSearch(e.target.value)}
+                    placeholder="Search ID, name, phone, city..."
+                    className="rounded-full border border-[#D7E4FF] dark:border-[#264096] bg-[var(--surface)] px-4 py-1.5 text-xs w-64"
+                  />
+                </div>
+
+                <div className="warm-card overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-[var(--bg)] border-b border-[#D7E4FF] dark:border-[#264096] text-[var(--muted)]">
+                      <tr>
+                        <th className="px-4 py-3">Booking ID</th>
+                        <th className="px-4 py-3">Customer</th>
+                        <th className="px-4 py-3">Product / Qty</th>
+                        <th className="px-4 py-3">24/7 Schedule</th>
+                        <th className="px-4 py-3">Site &amp; Estimate</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Manage Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#D7E4FF] dark:divide-[#264096]">
+                      {filteredBookings.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
+                            No matching bookings found.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredBookings.map((b) => {
+                          const isUnread = Number(b.is_read ?? 1) === 0;
+                          const emailSt = b.email_status || 'pending';
+                          const waSt = b.whatsapp_status || 'pending';
+                          return (
+                            <tr
+                              key={b.id || b.booking_code}
+                              className={`hover:bg-[var(--bg)]/50 align-top ${isUnread ? 'bg-[#FFFBEB]/60 dark:bg-[#1E293B]/50' : ''}`}
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setConfirmCancelBookingId(null);
+                                      setViewingBooking(b);
+                                      if (isUnread) void markLeadRead('booking', b.id, true);
+                                    }}
+                                    className="font-mono font-bold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline cursor-pointer"
+                                  >
+                                    {b.booking_code}
+                                  </button>
+                                  {isUnread && (
+                                    <span className="px-1.5 py-0.5 rounded-full bg-[#D92B25] text-white text-[9px] font-bold uppercase">
+                                      New
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-[var(--muted)] mt-0.5 tabular-nums">
+                                  {String(b.created_at || '').slice(0, 10)}
+                                </p>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  <span
+                                    title={b.email_error || `Email: ${emailSt}`}
+                                    className={`px-1.5 py-0.5 rounded border text-[9px] font-semibold ${getDeliveryStatusClass(emailSt)}`}
+                                  >
+                                    Email: {emailSt}
+                                  </span>
+                                  <span
+                                    title={b.whatsapp_error || `WhatsApp: ${waSt}`}
+                                    className={`px-1.5 py-0.5 rounded border text-[9px] font-semibold ${getDeliveryStatusClass(waSt)}`}
+                                  >
+                                    WA: {waSt}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="font-semibold">{b.customer_name}</p>
+                                <p className="text-[var(--muted)] tabular-nums">{b.phone}</p>
+                                {b.email && <p className="text-[11px] text-[var(--muted)] truncate max-w-[160px]">{b.email}</p>}
+                              </td>
+                              <td className="px-4 py-3 tabular-nums">
+                                <p className="font-semibold">
+                                  {b.grade} · {Number(b.quantity_m3).toLocaleString('en-IN')}{' '}
+                                  {b.unit_type === 'pieces' ? 'pcs' : 'm³'}
+                                </p>
+                                <p className="text-[11px] text-[var(--muted)]">
+                                  {b.unit_type !== 'pieces' ? `Pump: ${b.pump_type} · ${b.usage_type}` : b.product_name}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 tabular-nums">
+                                <p className="font-semibold">{b.delivery_date}</p>
+                                <p className="text-[var(--muted)]">{b.slot_label}</p>
+                              </td>
+                              <td className="px-4 py-3 max-w-[200px]">
+                                <p className="truncate font-medium">
+                                  {b.city} ({b.distance_km} km)
+                                </p>
+                                <p className="text-[11px] text-[var(--muted)] font-mono tabular-nums">
+                                  {b.dispatch_plant_name ? `From ${b.dispatch_plant_name} · ` : ''}Est. INR{' '}
+                                  {Number(b.estimated_total || 0).toLocaleString('en-IN')}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="space-y-1.5">
+                                  <span
+                                    className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase tracking-wide ${getStatusBadgeClass(
+                                      b.status
+                                    )}`}
+                                  >
+                                    {b.status}
+                                  </span>
+                                  <select
+                                    aria-label={`Change status for ${b.booking_code}`}
+                                    value={b.status}
+                                    disabled={bookingActionBusy}
+                                    onChange={(e) => updateBooking(b.id, { status: e.target.value })}
+                                    className="block w-full rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2 py-1 text-[11px]"
+                                  >
+                                    <option value="confirmed">Confirmed</option>
+                                    <option value="waitlisted">Waitlisted</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="dispatched">Dispatched</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="cancelled">Cancelled</option>
+                                  </select>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setConfirmCancelBookingId(null);
+                                      setViewingBooking(b);
+                                      if (isUnread) void markLeadRead('booking', b.id, true);
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2.5 py-1.5 font-semibold hover:border-[#1F3FA8] cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>View</span>
+                                  </button>
+                                  {isOwner && (
+                                    <button
+                                      type="button"
+                                      disabled={resendingKey === `booking:${b.id}`}
+                                      onClick={() => resendLeadNotification('booking', b.id)}
+                                      title="Resend owner email & WhatsApp notification"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1.5 font-semibold hover:border-[#1F3FA8] cursor-pointer disabled:opacity-60"
+                                    >
+                                      <RefreshCw
+                                        className={`w-3.5 h-3.5 ${resendingKey === `booking:${b.id}` ? 'animate-spin' : ''}`}
+                                      />
+                                      <span>Resend</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditBookingModal(b)}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-[#1F3FA8] text-white px-2.5 py-1.5 font-semibold hover:bg-[#173187] cursor-pointer"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    <span>Edit</span>
+                                  </button>
+                                  {b.status !== 'cancelled' && b.status !== 'completed' && (
+                                    confirmCancelBookingId === b.id ? (
+                                      <div className="inline-flex items-center gap-1 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-300 dark:border-red-700 px-2 py-1">
+                                        <button
+                                          type="button"
+                                          disabled={bookingActionBusy}
+                                          onClick={() => updateBooking(b.id, { status: 'cancelled' })}
+                                          className="text-red-700 dark:text-red-300 font-bold hover:underline cursor-pointer"
+                                        >
+                                          Confirm
+                                        </button>
+                                        <span className="text-[var(--muted)]">/</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setConfirmCancelBookingId(null)}
+                                          className="text-[var(--muted)] hover:underline cursor-pointer"
+                                        >
+                                          Keep
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmCancelBookingId(b.id)}
+                                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-2.5 py-1.5 font-semibold hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                                      >
+                                        <Ban className="w-3.5 h-3.5" />
+                                        <span>Cancel</span>
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+
+            {isOwner && appointmentsSubTab === 'visits' && (
+              <div className="warm-card overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-[var(--bg)] border-b border-[#D7E4FF] dark:border-[#264096] text-[var(--muted)]">
+                    <tr>
+                      <th className="px-4 py-3">Visit Code</th>
+                      <th className="px-4 py-3">Visitor</th>
+                      <th className="px-4 py-3">Visit Type &amp; Location</th>
+                      <th className="px-4 py-3">Preferred Schedule</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Manage Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#D7E4FF] dark:divide-[#264096]">
+                    {(overview.siteVisits || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
+                          No site or plant visit appointments scheduled yet.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : (
+                      (overview.siteVisits || []).map((sv) => {
+                        const isUnread = Number(sv.is_read ?? 1) === 0;
+                        const emailSt = sv.email_status || 'pending';
+                        const waSt = sv.whatsapp_status || 'pending';
+                        return (
+                          <tr
+                            key={sv.id}
+                            className={`hover:bg-[var(--bg)]/50 align-top ${isUnread ? 'bg-[#FFFBEB]/60 dark:bg-[#1E293B]/50' : ''}`}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-mono font-bold text-[#1F3FA8] dark:text-[#FFC93C]">
+                                  {sv.visit_code}
+                                </span>
+                                {isUnread && (
+                                  <span className="px-1.5 py-0.5 rounded-full bg-[#D92B25] text-white text-[9px] font-bold uppercase">
+                                    New
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                <span
+                                  title={sv.email_error || `Email: ${emailSt}`}
+                                  className={`px-1.5 py-0.5 rounded border text-[9px] font-semibold ${getDeliveryStatusClass(emailSt)}`}
+                                >
+                                  Email: {emailSt}
+                                </span>
+                                <span
+                                  title={sv.whatsapp_error || `WhatsApp: ${waSt}`}
+                                  className={`px-1.5 py-0.5 rounded border text-[9px] font-semibold ${getDeliveryStatusClass(waSt)}`}
+                                >
+                                  WA: {waSt}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-semibold">{sv.customer_name}</p>
+                              <p className="text-[var(--muted)] tabular-nums">{sv.phone}</p>
+                              {sv.email && <p className="text-[11px] text-[var(--muted)]">{sv.email}</p>}
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="font-semibold capitalize">{sv.visit_type.replace('_', ' ')}</p>
+                              <p className="text-[var(--muted)]">{sv.location || 'Kotihal Plant'}</p>
+                              {sv.notes && <p className="text-[11px] text-[var(--muted)] mt-0.5">{sv.notes}</p>}
+                            </td>
+                            <td className="px-4 py-3 tabular-nums">
+                              <p className="font-semibold">{sv.preferred_date}</p>
+                              <p className="text-[var(--muted)]">{sv.preferred_time}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${getStatusBadgeClass(
+                                  sv.status
+                                )}`}
+                              >
+                                {sv.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                                {isUnread && (
+                                  <button
+                                    type="button"
+                                    onClick={() => markLeadRead('visit', sv.id, true)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1.5 font-semibold hover:border-[#1F3FA8] cursor-pointer"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Mark Read</span>
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={resendingKey === `visit:${sv.id}`}
+                                  onClick={() => resendLeadNotification('visit', sv.id)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1.5 font-semibold hover:border-[#1F3FA8] cursor-pointer disabled:opacity-60"
+                                >
+                                  <RefreshCw className={`w-3.5 h-3.5 ${resendingKey === `visit:${sv.id}` ? 'animate-spin' : ''}`} />
+                                  <span>Resend</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isUnread) void markLeadRead('visit', sv.id, true);
+                                    openEditVisitModal(sv);
+                                  }}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-[#1F3FA8] text-white px-2.5 py-1.5 font-semibold hover:bg-[#173187] cursor-pointer"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                                {sv.status !== 'completed' && sv.status !== 'cancelled' && (
+                                  <button
+                                    type="button"
+                                    disabled={visitActionBusy}
+                                    onClick={() => updateSiteVisit(sv.id, { status: 'completed' })}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 px-2.5 py-1.5 font-semibold cursor-pointer"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Complete</span>
+                                  </button>
+                                )}
+                                {sv.status !== 'cancelled' && (
+                                  confirmCancelVisitId === sv.id ? (
+                                    <div className="inline-flex items-center gap-1 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-300 px-2 py-1">
+                                      <button
+                                        type="button"
+                                        disabled={visitActionBusy}
+                                        onClick={() => updateSiteVisit(sv.id, { status: 'cancelled' })}
+                                        className="text-red-700 dark:text-red-300 font-bold hover:underline cursor-pointer"
+                                      >
+                                        Confirm
+                                      </button>
+                                      <span className="text-[var(--muted)]">/</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmCancelVisitId(null)}
+                                        className="text-[var(--muted)] hover:underline cursor-pointer"
+                                      >
+                                        Keep
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => setConfirmCancelVisitId(sv.id)}
+                                      className="inline-flex items-center gap-1 rounded-lg border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-2.5 py-1.5 font-semibold cursor-pointer"
+                                    >
+                                      <Ban className="w-3.5 h-3.5" />
+                                      <span>Cancel</span>
+                                    </button>
+                                  )
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
@@ -1225,45 +2097,126 @@ export function AdminDashboardPage({
         {isOwner && tab === 'inbox' && overview && (
           <div className="space-y-6">
             <div className="warm-card p-5 space-y-3">
-              <h2 className="font-display font-bold text-base">Quote Requests ({(overview.quotes || []).length})</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-display font-bold text-base">
+                  Quote Requests ({(overview.quotes || []).length})
+                  {(overview.unreadCounts?.quotes || 0) > 0 && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#D92B25] text-white text-[10px] font-bold">
+                      {overview.unreadCounts?.quotes} Unread
+                    </span>
+                  )}
+                </h2>
+              </div>
               {(overview.quotes || []).length === 0 ? (
                 <p className="text-xs text-[var(--muted)]">No quote requests yet.</p>
               ) : (
                 <div className="divide-y divide-[#D7E4FF] dark:divide-[#264096] text-xs">
-                  {(overview.quotes || []).map((q) => (
-                    <div key={String(q.id)} className="py-3 flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">
-                          <span className="font-mono mr-2">{String(q.quote_code)}</span>
-                          {String(q.customer_name)} ({String(q.phone)}) · {String(q.grade)} · {String(q.quantity_m3)}
-                        </p>
-                        <p className="text-[var(--muted)]">
-                          {String(q.project_type)} · {String(q.location)} · Timeline: {String(q.timeline)}
-                          {q.attachment_name ? ` · Attachment: ${String(q.attachment_name)}` : ''}
-                        </p>
-                      </div>
-                      <select
-                        value={String(q.status)}
-                        onChange={async (e) => {
-                          const res = await fetch(`/api/admin/quotes/${String(q.id)}`, {
-                            method: 'PATCH',
-                            headers: { 'Content-Type': 'application/json' },
-                            credentials: 'include',
-                            body: JSON.stringify({ status: e.target.value }),
-                          });
-                          if (handleApiAuthFailure(res)) return;
-                          fetchOverview();
-                          showToast('Quote status updated.');
-                        }}
-                        className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2 py-1"
+                  {(overview.quotes || []).map((q) => {
+                    const qId = Number(q.id);
+                    const isUnread = Number(q.is_read ?? 1) === 0;
+                    const emailSt = String(q.email_status || 'pending');
+                    const waSt = String(q.whatsapp_status || 'pending');
+                    const emailErr = String(q.email_error || '');
+                    const waErr = String(q.whatsapp_error || '');
+                    return (
+                      <div
+                        key={String(q.id)}
+                        className={`py-3 flex flex-wrap items-start justify-between gap-3 ${isUnread ? 'bg-[#FFFBEB]/50 dark:bg-[#1E293B]/40 -mx-2 px-2 rounded-lg' : ''}`}
                       >
-                        <option value="new">New</option>
-                        <option value="reviewed">Reviewed</option>
-                        <option value="quoted">Quoted</option>
-                        <option value="converted">Converted</option>
-                      </select>
-                    </div>
-                  ))}
+                        <div className="space-y-1">
+                          <p className="font-semibold flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-[#1F3FA8] dark:text-[#FFC93C]">{String(q.quote_code)}</span>
+                            {isUnread && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-[#D92B25] text-white text-[9px] font-bold uppercase">
+                                New
+                              </span>
+                            )}
+                            <span>
+                              {String(q.customer_name)} ({String(q.phone)}) · {String(q.grade)} · {String(q.quantity_m3)}
+                            </span>
+                          </p>
+                          <p className="text-[var(--muted)]">
+                            {String(q.project_type)} · {String(q.location)} · Timeline: {String(q.timeline)}
+                            {q.email ? ` · ${String(q.email)}` : ''}
+                            {q.attachment_name ? ` · Attachment: ${String(q.attachment_name)}` : ''}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              title={emailErr || `Email: ${emailSt}`}
+                              className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(emailSt)}`}
+                            >
+                              Email: {emailSt}
+                            </span>
+                            <span
+                              title={waErr || `WhatsApp: ${waSt}`}
+                              className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(waSt)}`}
+                            >
+                              WhatsApp: {waSt}
+                            </span>
+                            {(emailErr || waErr) && (
+                              <span className="text-[10px] text-red-600 dark:text-red-300">
+                                {[emailErr, waErr].filter(Boolean).join(' | ')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {isUnread && (
+                            <button
+                              type="button"
+                              onClick={() => markLeadRead('quote', qId, true)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              <span>Mark Read</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={resendingKey === `quote:${qId}`}
+                            onClick={() => resendLeadNotification('quote', qId)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2.5 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer disabled:opacity-60"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${resendingKey === `quote:${qId}` ? 'animate-spin' : ''}`} />
+                            <span>Resend notification</span>
+                          </button>
+                          <a
+                            href={buildWhatsAppUrl(
+                              String(q.phone),
+                              `Namaskara ${String(q.customer_name)}, this is MY CONCRETE – Readymix Concrete Unit regarding your quote request ${String(q.quote_code)} (${String(q.grade)}, Qty: ${String(q.quantity_m3)}, Location: ${String(q.location)}).`
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg bg-[#16A34A] text-white px-2.5 py-1 font-semibold hover:brightness-110"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5" />
+                            <span>WhatsApp Customer</span>
+                          </a>
+                          <select
+                            value={String(q.status)}
+                            onChange={async (e) => {
+                              const res = await fetch(`/api/admin/quotes/${String(q.id)}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                credentials: 'include',
+                                body: JSON.stringify({ status: e.target.value }),
+                              });
+                              if (handleApiAuthFailure(res)) return;
+                              if (isUnread) await markLeadRead('quote', qId, true);
+                              else fetchOverview();
+                              showToast('Quote status updated.');
+                            }}
+                            className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2 py-1"
+                          >
+                            <option value="new">New</option>
+                            <option value="reviewed">Reviewed</option>
+                            <option value="quoted">Quoted</option>
+                            <option value="converted">Converted</option>
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1271,23 +2224,89 @@ export function AdminDashboardPage({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="warm-card p-5 space-y-3">
                 <h2 className="font-display font-bold text-base">
-                  Enquiries &amp; Partner Leads ({(overview.enquiries || []).length})
+                  Enquiries, Partner &amp; Careers Leads ({(overview.enquiries || []).length})
+                  {(overview.unreadCounts?.enquiries || 0) > 0 && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#D92B25] text-white text-[10px] font-bold">
+                      {overview.unreadCounts?.enquiries} Unread
+                    </span>
+                  )}
                 </h2>
                 {(overview.enquiries || []).length === 0 ? (
                   <p className="text-xs text-[var(--muted)]">No enquiries yet.</p>
                 ) : (
                   <div className="divide-y divide-[#D7E4FF] dark:divide-[#264096] text-xs">
-                    {(overview.enquiries || []).map((enq) => (
-                      <div key={String(enq.id)} className="py-3 space-y-1">
-                        <div className="flex justify-between">
-                          <span className="font-semibold">
-                            {String(enq.name)} ({String(enq.phone)}) · {String(enq.type).toUpperCase()}
-                          </span>
-                          <span className="text-[var(--muted)]">{String(enq.city)}</span>
+                    {(overview.enquiries || []).map((enq) => {
+                      const eId = Number(enq.id);
+                      const isUnread = Number(enq.is_read ?? 1) === 0;
+                      const emailSt = String(enq.email_status || 'pending');
+                      const waSt = String(enq.whatsapp_status || 'pending');
+                      const emailErr = String(enq.email_error || '');
+                      const waErr = String(enq.whatsapp_error || '');
+                      return (
+                        <div
+                          key={String(enq.id)}
+                          className={`py-3 space-y-1.5 ${isUnread ? 'bg-[#FFFBEB]/50 dark:bg-[#1E293B]/40 -mx-2 px-2 rounded-lg' : ''}`}
+                        >
+                          <div className="flex flex-wrap justify-between items-center gap-2">
+                            <span className="font-semibold flex items-center gap-1.5 flex-wrap">
+                              {Boolean(enq.enquiry_code) && (
+                                <span className="font-mono text-[#1F3FA8] dark:text-[#FFC93C]">
+                                  {String(enq.enquiry_code)}
+                                </span>
+                              )}
+                              {isUnread && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-[#D92B25] text-white text-[9px] font-bold uppercase">
+                                  New
+                                </span>
+                              )}
+                              <span>
+                                {String(enq.name)} ({String(enq.phone)}) · {String(enq.type).toUpperCase()}
+                              </span>
+                            </span>
+                            <span className="text-[var(--muted)]">{String(enq.city)}</span>
+                          </div>
+                          {Boolean(enq.email) && <p className="text-[11px] text-[var(--muted)]">{String(enq.email)}</p>}
+                          <p className="text-[var(--muted)]">{String(enq.message)}</p>
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <div className="flex flex-wrap gap-1.5">
+                              <span
+                                title={emailErr || `Email: ${emailSt}`}
+                                className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(emailSt)}`}
+                              >
+                                Email: {emailSt}
+                              </span>
+                              <span
+                                title={waErr || `WhatsApp: ${waSt}`}
+                                className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(waSt)}`}
+                              >
+                                WA: {waSt}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {isUnread && (
+                                <button
+                                  type="button"
+                                  onClick={() => markLeadRead('enquiry', eId, true)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>Mark Read</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                disabled={resendingKey === `enquiry:${eId}`}
+                                onClick={() => resendLeadNotification('enquiry', eId)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer disabled:opacity-60"
+                              >
+                                <RefreshCw className={`w-3 h-3 ${resendingKey === `enquiry:${eId}` ? 'animate-spin' : ''}`} />
+                                <span>Resend</span>
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-[var(--muted)]">{String(enq.message)}</p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1295,22 +2314,87 @@ export function AdminDashboardPage({
               <div className="warm-card p-5 space-y-3">
                 <h2 className="font-display font-bold text-base">
                   Site &amp; Plant Visits ({(overview.siteVisits || []).length})
+                  {(overview.unreadCounts?.siteVisits || 0) > 0 && (
+                    <span className="ml-2 px-2 py-0.5 rounded-full bg-[#D92B25] text-white text-[10px] font-bold">
+                      {overview.unreadCounts?.siteVisits} Unread
+                    </span>
+                  )}
                 </h2>
                 {(overview.siteVisits || []).length === 0 ? (
                   <p className="text-xs text-[var(--muted)]">No scheduled site/plant visits yet.</p>
                 ) : (
                   <div className="divide-y divide-[#D7E4FF] dark:divide-[#264096] text-xs">
-                    {(overview.siteVisits || []).map((sv) => (
-                      <div key={String(sv.id)} className="py-3 space-y-1">
-                        <p className="font-semibold">
-                          <span className="font-mono mr-2">{String(sv.visit_code)}</span>
-                          {String(sv.customer_name)} ({String(sv.phone)})
-                        </p>
-                        <p className="text-[var(--muted)]">
-                          {String(sv.visit_type)} · {String(sv.preferred_date)} at {String(sv.preferred_time)}
-                        </p>
-                      </div>
-                    ))}
+                    {(overview.siteVisits || []).map((sv) => {
+                      const isUnread = Number(sv.is_read ?? 1) === 0;
+                      const emailSt = sv.email_status || 'pending';
+                      const waSt = sv.whatsapp_status || 'pending';
+                      return (
+                        <div
+                          key={String(sv.id)}
+                          className={`py-3 flex flex-wrap items-start justify-between gap-2 ${isUnread ? 'bg-[#FFFBEB]/50 dark:bg-[#1E293B]/40 -mx-2 px-2 rounded-lg' : ''}`}
+                        >
+                          <div className="space-y-1">
+                            <p className="font-semibold flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-[#1F3FA8] dark:text-[#FFC93C]">{String(sv.visit_code)}</span>
+                              {isUnread && (
+                                <span className="px-1.5 py-0.5 rounded-full bg-[#D92B25] text-white text-[9px] font-bold uppercase">
+                                  New
+                                </span>
+                              )}
+                              <span>
+                                {String(sv.customer_name)} ({String(sv.phone)})
+                              </span>
+                            </p>
+                            <p className="text-[var(--muted)]">
+                              {String(sv.visit_type).replace('_', ' ')} · {String(sv.preferred_date)} at{' '}
+                              {String(sv.preferred_time)} · {sv.location || 'Kotihal Plant'}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              <span
+                                title={sv.email_error || `Email: ${emailSt}`}
+                                className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(emailSt)}`}
+                              >
+                                Email: {emailSt}
+                              </span>
+                              <span
+                                title={sv.whatsapp_error || `WhatsApp: ${waSt}`}
+                                className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(waSt)}`}
+                              >
+                                WA: {waSt}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span
+                              className={`px-2 py-0.5 rounded-full border text-[10px] font-bold uppercase ${getStatusBadgeClass(
+                                sv.status
+                              )}`}
+                            >
+                              {sv.status}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={resendingKey === `visit:${sv.id}`}
+                              onClick={() => resendLeadNotification('visit', sv.id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer disabled:opacity-60"
+                            >
+                              <RefreshCw className={`w-3 h-3 ${resendingKey === `visit:${sv.id}` ? 'animate-spin' : ''}`} />
+                              <span>Resend</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (isUnread) void markLeadRead('visit', sv.id, true);
+                                openEditVisitModal(sv);
+                              }}
+                              className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1318,15 +2402,173 @@ export function AdminDashboardPage({
 
             <div className="warm-card p-5 space-y-3">
               <h2 className="font-display font-bold text-base">
+                Newsletter Subscribers ({(overview.subscribers || []).length})
+                {(overview.unreadCounts?.subscribers || 0) > 0 && (
+                  <span className="ml-2 px-2 py-0.5 rounded-full bg-[#D92B25] text-white text-[10px] font-bold">
+                    {overview.unreadCounts?.subscribers} Unread
+                  </span>
+                )}
+              </h2>
+              {(overview.subscribers || []).length === 0 ? (
+                <p className="text-xs text-[var(--muted)]">No newsletter subscribers yet.</p>
+              ) : (
+                <div className="divide-y divide-[#D7E4FF] dark:divide-[#264096] text-xs">
+                  {(overview.subscribers || []).map((sub) => {
+                    const sId = Number(sub.id);
+                    const isUnread = Number(sub.is_read ?? 1) === 0;
+                    const emailSt = String(sub.email_status || 'pending');
+                    const waSt = String(sub.whatsapp_status || 'pending');
+                    const emailErr = String(sub.email_error || '');
+                    const waErr = String(sub.whatsapp_error || '');
+                    return (
+                      <div
+                        key={String(sub.id)}
+                        className={`py-2.5 flex flex-wrap items-center justify-between gap-2 ${isUnread ? 'bg-[#FFFBEB]/50 dark:bg-[#1E293B]/40 -mx-2 px-2 rounded-lg' : ''}`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {Boolean(sub.sub_code) && (
+                              <span className="font-mono font-bold text-[#1F3FA8] dark:text-[#FFC93C]">
+                                {String(sub.sub_code)}
+                              </span>
+                            )}
+                            {isUnread && (
+                              <span className="px-1.5 py-0.5 rounded-full bg-[#D92B25] text-white text-[9px] font-bold uppercase">
+                                New
+                              </span>
+                            )}
+                            <span className="font-semibold">{String(sub.email)}</span>
+                            <span className="text-[11px] text-[var(--muted)]">
+                              {String(sub.created_at || '').slice(0, 16).replace('T', ' ')}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            <span
+                              title={emailErr || `Email: ${emailSt}`}
+                              className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(emailSt)}`}
+                            >
+                              Email: {emailSt}
+                            </span>
+                            <span
+                              title={waErr || `WhatsApp: ${waSt}`}
+                              className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${getDeliveryStatusClass(waSt)}`}
+                            >
+                              WA: {waSt}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {isUnread && (
+                            <button
+                              type="button"
+                              onClick={() => markLeadRead('newsletter', sId, true)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer"
+                            >
+                              <Check className="w-3 h-3" />
+                              <span>Mark Read</span>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={resendingKey === `newsletter:${sId}`}
+                            onClick={() => resendLeadNotification('newsletter', sId)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#D7E4FF] dark:border-[#264096] px-2 py-1 font-semibold hover:border-[#1F3FA8] cursor-pointer disabled:opacity-60"
+                          >
+                            <RefreshCw
+                              className={`w-3 h-3 ${resendingKey === `newsletter:${sId}` ? 'animate-spin' : ''}`}
+                            />
+                            <span>Resend</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="warm-card p-5 space-y-4">
+              {overview.notificationStatus && (
+                <div className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] p-4 space-y-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-display font-bold text-sm text-[#0F1F5C] dark:text-white">
+                      Email &amp; WhatsApp Alert Channels
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setTab('settings')}
+                      className="inline-flex items-center gap-1 rounded-lg bg-[#1F3FA8] text-white px-3 py-1 font-semibold hover:bg-[#173187] cursor-pointer"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>Configure &amp; Test in Settings</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex items-start gap-2">
+                      <Mail className="w-4 h-4 text-[#D92B25] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">
+                          Owner Alert Email: <span className="font-mono">{overview.notificationStatus.ownerEmail}</span>
+                        </p>
+                        <p className="text-[var(--muted)]">
+                          {overview.notificationStatus.emailEnabled === false
+                            ? 'Paused in Settings → Notifications'
+                            : overview.notificationStatus.emailConfigured
+                              ? `Active via ${overview.notificationStatus.emailProvider.toUpperCase()} (3 background retries)`
+                              : 'No SMTP/Resend credentials in .env — add SMTP_USER & SMTP_PASS or RESEND_API_KEY'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <MessageCircle className="w-4 h-4 text-[#16A34A] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">
+                          Owner WhatsApp: <span className="font-mono">+{overview.notificationStatus.ownerWhatsapp}</span>
+                          {overview.notificationStatus.ownerWhatsapp2 && (
+                            <span className="font-mono text-[var(--muted)]">
+                              {' '}
+                              &amp; +{overview.notificationStatus.ownerWhatsapp2}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-[var(--muted)]">
+                          {overview.notificationStatus.whatsappEnabled === false
+                            ? 'Paused in Settings → Notifications'
+                            : overview.notificationStatus.whatsappAutoConfigured
+                              ? `Active via ${overview.notificationStatus.whatsappProvider.toUpperCase()} (3 background retries)`
+                              : `Provider: ${overview.notificationStatus.whatsappProvider.toUpperCase()} · Configure credentials in .env to enable automated background sends`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <h2 className="font-display font-bold text-base">
                 Notification Outbox Log ({(overview.emailLogs || []).length})
               </h2>
-              <div className="max-h-52 overflow-y-auto divide-y divide-[#D7E4FF] dark:divide-[#264096] text-xs">
+              <div className="max-h-60 overflow-y-auto divide-y divide-[#D7E4FF] dark:divide-[#264096] text-xs">
                 {(overview.emailLogs || []).map((log) => (
-                  <div key={String(log.id)} className="py-2 flex justify-between gap-4">
-                    <span className="truncate">
-                      <strong>{String(log.subject)}</strong> &rarr; {String(log.recipient)}
-                    </span>
-                    <span className="font-mono text-[var(--muted)] shrink-0">{String(log.delivery_mode)}</span>
+                  <div key={String(log.id)} className="py-2 flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate">
+                        {Boolean(log.reference_code) && (
+                          <span className="font-mono font-bold text-[#1F3FA8] dark:text-[#FFC93C] mr-1.5">
+                            [{String(log.reference_code)}]
+                          </span>
+                        )}
+                        <strong>{String(log.subject)}</strong> &rarr; {String(log.recipient)}
+                      </p>
+                      {Boolean(log.error_detail) && (
+                        <p className="text-[11px] text-red-600 dark:text-red-300 truncate">{String(log.error_detail)}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="uppercase text-[10px] font-bold text-[var(--muted)]">
+                        {String(log.channel || 'email')}
+                      </span>
+                      <span className="font-mono text-[var(--muted)]">{String(log.delivery_mode)}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1606,6 +2848,577 @@ export function AdminDashboardPage({
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB: LOCATIONS */}
+        {isOwner && tab === 'locations' && (
+          <div className="space-y-6">
+            <div className="warm-card p-6 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-display font-bold text-lg">Plant &amp; Dispatch Locations</h2>
+                  <p className="text-xs text-[var(--muted)]">
+                    Manage Kotihal, Davangere, or add new branches. Changes update all maps, Contact Google Map embeds, JSON-LD, and Booking &ldquo;Delivery from&rdquo; options automatically.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => saveSetting('plantLocations', locationsForm)}
+                  className="btn-orange-pill px-5 py-2 text-xs cursor-pointer"
+                >
+                  Save All Locations
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {locationsForm.map((loc, idx) => (
+                  <div
+                    key={loc.id}
+                    className="rounded-2xl border border-[#D7E4FF] dark:border-[#264096] p-4 sm:p-5 space-y-4 bg-[var(--bg)]/40 text-xs"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#D7E4FF] dark:border-[#264096] pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-extrabold text-white ${
+                            loc.pinColor === 'red' ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                          }`}
+                        >
+                          {loc.pinColor === 'red' ? <MapPin className="w-3.5 h-3.5" /> : 'MC'}
+                        </span>
+                        <span className="font-display font-bold text-sm text-[#0F1F5C] dark:text-white">
+                          {loc.name || `Location ${idx + 1}`}
+                        </span>
+                        <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096]">
+                          ID: {loc.id}
+                        </span>
+                      </div>
+
+                      {locationsForm.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = locationsForm.filter((_, i) => i !== idx);
+                            setLocationsForm(next);
+                          }}
+                          className="inline-flex items-center gap-1 text-red-600 hover:underline font-semibold cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Unit Name *</label>
+                        <input
+                          type="text"
+                          value={loc.name}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, name: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Short Label (Booking Selector) *</label>
+                        <input
+                          type="text"
+                          value={loc.shortLabel}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, shortLabel: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">City *</label>
+                        <input
+                          type="text"
+                          value={loc.city}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, city: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-[var(--muted)] mb-1">Full Address *</label>
+                        <input
+                          type="text"
+                          value={loc.address}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, address: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Pincode</label>
+                        <input
+                          type="text"
+                          value={loc.postalCode}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, postalCode: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Latitude *</label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={loc.lat}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, lat: Number(e.target.value) };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Longitude *</label>
+                        <input
+                          type="number"
+                          step="0.0001"
+                          value={loc.lng}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, lng: Number(e.target.value) };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Service Radius (km)</label>
+                        <input
+                          type="number"
+                          value={loc.serviceRadiusKm}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, serviceRadiusKm: Number(e.target.value) };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Phone *</label>
+                        <input
+                          type="text"
+                          value={loc.phone}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, phone: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Working Hours *</label>
+                        <input
+                          type="text"
+                          value={loc.hours}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, hours: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[var(--muted)] mb-1">Map Pin Color</label>
+                        <select
+                          value={loc.pinColor || 'red'}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, pinColor: e.target.value as 'blue' | 'red' };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                        >
+                          <option value="blue">Blue MC Pin</option>
+                          <option value="red">Red Branch Pin</option>
+                        </select>
+                      </div>
+                      <div className="sm:col-span-2 lg:col-span-3">
+                        <label className="block text-[var(--muted)] mb-1">Google Maps Link</label>
+                        <input
+                          type="text"
+                          value={loc.googleMapsUrl}
+                          onChange={(e) => {
+                            const next = [...locationsForm];
+                            next[idx] = { ...loc, googleMapsUrl: e.target.value };
+                            setLocationsForm(next);
+                          }}
+                          className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const latNum = Number(newLocationForm.lat);
+                const lngNum = Number(newLocationForm.lng);
+                if (!newLocationForm.name.trim() || !newLocationForm.address.trim() || !Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+                  showToast('Enter unit name, address, latitude, and longitude.');
+                  return;
+                }
+                const baseSlug = (newLocationForm.shortLabel || newLocationForm.city || newLocationForm.name)
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '-')
+                  .replace(/^-|-$/g, '') || 'unit';
+                const uniqueId = locationsForm.some((l) => l.id === baseSlug)
+                  ? `${baseSlug}-${Date.now().toString().slice(-4)}`
+                  : baseSlug;
+                const added: PlantLocation = {
+                  id: uniqueId,
+                  name: newLocationForm.name.trim(),
+                  shortLabel: newLocationForm.shortLabel.trim() || newLocationForm.city.trim() || 'Branch',
+                  address: newLocationForm.address.trim(),
+                  city: newLocationForm.city.trim() || 'Karnataka',
+                  postalCode: newLocationForm.postalCode.trim(),
+                  lat: latNum,
+                  lng: lngNum,
+                  phone: newLocationForm.phone.trim() || '+91 73378 07372',
+                  whatsapp: newLocationForm.whatsapp.trim() || newLocationForm.phone.trim() || '+91 73378 07372',
+                  hours: newLocationForm.hours.trim() || 'Open 24 Hours (All Days)',
+                  serviceRadiusKm: Number(newLocationForm.serviceRadiusKm) || 50,
+                  googleMapsUrl:
+                    newLocationForm.googleMapsUrl.trim() ||
+                    `https://www.google.com/maps/search/?api=1&query=${latNum},${lngNum}`,
+                  pinColor: newLocationForm.pinColor,
+                  isPrimary: false,
+                };
+                const next = [...locationsForm, added];
+                setLocationsForm(next);
+                await saveSetting('plantLocations', next);
+                setNewLocationForm({
+                  name: '',
+                  shortLabel: '',
+                  address: '',
+                  city: '',
+                  postalCode: '',
+                  lat: '14.4644',
+                  lng: '75.9218',
+                  phone: '+91 73378 07372',
+                  whatsapp: '+91 73378 07372',
+                  hours: 'Open 24 Hours (All Days)',
+                  serviceRadiusKm: '50',
+                  googleMapsUrl: '',
+                  pinColor: 'red',
+                });
+              }}
+              className="warm-card p-6 space-y-4 text-xs"
+            >
+              <div className="flex items-center gap-2">
+                <Plus className="w-4 h-4 text-[#D92B25]" />
+                <h3 className="font-display font-bold text-base">Add Another Location</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Unit Name (e.g. MY CONCRETE – Harihar Unit) *"
+                  value={newLocationForm.name}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, name: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+                <input
+                  type="text"
+                  placeholder="Short Label (e.g. Harihar)"
+                  value={newLocationForm.shortLabel}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, shortLabel: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+                <input
+                  type="text"
+                  placeholder="City (e.g. Harihar)"
+                  value={newLocationForm.city}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, city: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+                <input
+                  type="text"
+                  required
+                  placeholder="Full Address *"
+                  value={newLocationForm.address}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, address: e.target.value })}
+                  className="sm:col-span-2 rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+                <input
+                  type="text"
+                  placeholder="Pincode"
+                  value={newLocationForm.postalCode}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, postalCode: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                />
+                <input
+                  type="number"
+                  step="0.0001"
+                  required
+                  placeholder="Latitude *"
+                  value={newLocationForm.lat}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, lat: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                />
+                <input
+                  type="number"
+                  step="0.0001"
+                  required
+                  placeholder="Longitude *"
+                  value={newLocationForm.lng}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, lng: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                />
+                <input
+                  type="text"
+                  placeholder="Phone (+91 73378 07372)"
+                  value={newLocationForm.phone}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, phone: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                />
+                <input
+                  type="text"
+                  placeholder="Hours (Open 24 Hours)"
+                  value={newLocationForm.hours}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, hours: e.target.value })}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+                <input
+                  type="text"
+                  placeholder="Google Maps Link (optional)"
+                  value={newLocationForm.googleMapsUrl}
+                  onChange={(e) => setNewLocationForm({ ...newLocationForm, googleMapsUrl: e.target.value })}
+                  className="sm:col-span-2 rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+              </div>
+              <button type="submit" className="btn-blue-pill px-5 py-2 text-xs cursor-pointer">
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add &amp; Save Location</span>
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* TAB: SETTINGS -> NOTIFICATIONS */}
+        {isOwner && tab === 'settings' && (
+          <div className="space-y-6">
+            <form onSubmit={saveNotificationSettings} className="warm-card p-6 space-y-5 text-xs">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-display font-bold text-base">Settings &rarr; Lead Notifications</h2>
+                  <p className="text-[var(--muted)] mt-1">
+                    Configure owner alert email, WhatsApp numbers, provider, and channel toggles for all 7 website forms.
+                    Secrets (SMTP passwords, API keys, tokens) are read strictly from server environment variables.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={notifTesting}
+                  onClick={sendTestNotification}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#16A34A] hover:brightness-110 text-white px-4 py-2 font-semibold cursor-pointer disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${notifTesting ? 'animate-spin' : ''}`} />
+                  <span>{notifTesting ? 'Sending Test…' : 'Send test notification'}</span>
+                </button>
+              </div>
+
+              {notifTestResult && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] p-4">
+                  <div className="space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <Mail className="w-4 h-4 text-[#D92B25]" />
+                      <span>Email Test ({notifTestResult.emailResult?.provider || 'smtp'})</span>
+                      <span
+                        className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase ${getDeliveryStatusClass(
+                          notifTestResult.emailResult?.status || 'pending'
+                        )}`}
+                      >
+                        {notifTestResult.emailResult?.status || 'unknown'}
+                      </span>
+                    </p>
+                    {notifTestResult.emailResult?.error && (
+                      <p className="text-red-600 dark:text-red-300">{notifTestResult.emailResult.error}</p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <MessageCircle className="w-4 h-4 text-[#16A34A]" />
+                      <span>WhatsApp Test ({notifTestResult.whatsappResult?.provider || 'none'})</span>
+                      <span
+                        className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase ${getDeliveryStatusClass(
+                          notifTestResult.whatsappResult?.status || 'pending'
+                        )}`}
+                      >
+                        {notifTestResult.whatsappResult?.status || 'unknown'}
+                      </span>
+                    </p>
+                    {notifTestResult.whatsappResult?.error && (
+                      <p className="text-red-600 dark:text-red-300">{notifTestResult.whatsappResult.error}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="flex items-center gap-2.5 rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifForm.emailEnabled}
+                    onChange={(e) => setNotifForm({ ...notifForm, emailEnabled: e.target.checked })}
+                  />
+                  <div>
+                    <p className="font-semibold">Enable Owner Email Alerts</p>
+                    <p className="text-[11px] text-[var(--muted)]">Gmail SMTP (port 465) or Resend</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2.5 rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifForm.whatsappEnabled}
+                    onChange={(e) => setNotifForm({ ...notifForm, whatsappEnabled: e.target.checked })}
+                  />
+                  <div>
+                    <p className="font-semibold">Enable Owner WhatsApp Alerts</p>
+                    <p className="text-[11px] text-[var(--muted)]">Uses selected pluggable provider</p>
+                  </div>
+                </label>
+                <label className="flex items-center gap-2.5 rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifForm.customerAckEnabled}
+                    onChange={(e) => setNotifForm({ ...notifForm, customerAckEnabled: e.target.checked })}
+                  />
+                  <div>
+                    <p className="font-semibold">Customer Acknowledgement Email</p>
+                    <p className="text-[11px] text-[var(--muted)]">Send receipt email when customer gives email</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="space-y-1">
+                  <span className="font-semibold">Owner Notification Email (NOTIFY_EMAIL)</span>
+                  <input
+                    type="email"
+                    required
+                    value={notifForm.notifyEmail}
+                    onChange={(e) => setNotifForm({ ...notifForm, notifyEmail: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="font-semibold">WhatsApp Provider (WHATSAPP_PROVIDER)</span>
+                  <select
+                    value={notifForm.whatsappProvider}
+                    onChange={(e) =>
+                      setNotifForm({
+                        ...notifForm,
+                        whatsappProvider: e.target.value as NotificationConfig['whatsappProvider'],
+                      })
+                    }
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  >
+                    <option value="callmebot">callmebot (Free CallMeBot API)</option>
+                    <option value="cloudapi">cloudapi (Meta WhatsApp Cloud API)</option>
+                    <option value="twilio">twilio (Twilio WhatsApp)</option>
+                    <option value="none">none (Skip background WhatsApp silently)</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="font-semibold">Primary Owner WhatsApp Number (OWNER_WHATSAPP)</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="917337807372"
+                    value={notifForm.ownerWhatsapp}
+                    onChange={(e) => setNotifForm({ ...notifForm, ownerWhatsapp: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 font-mono"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="font-semibold">Second Owner / Staff WhatsApp (OWNER_WHATSAPP_2, optional)</span>
+                  <input
+                    type="text"
+                    placeholder="919876543210"
+                    value={notifForm.ownerWhatsapp2}
+                    onChange={(e) => setNotifForm({ ...notifForm, ownerWhatsapp2: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 font-mono"
+                  />
+                </label>
+                {notifForm.whatsappProvider === 'cloudapi' && (
+                  <label className="space-y-1 sm:col-span-2">
+                    <span className="font-semibold">Meta Cloud API Approved Template Name (optional)</span>
+                    <input
+                      type="text"
+                      placeholder="Leave blank for 24h session text messages, or enter approved template name (e.g. lead_alert)"
+                      value={notifForm.whatsappTemplateName}
+                      onChange={(e) => setNotifForm({ ...notifForm, whatsappTemplateName: e.target.value })}
+                      className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 font-mono"
+                    />
+                  </label>
+                )}
+              </div>
+
+              {overview?.envCredentialStatus && (
+                <div className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] p-4 space-y-2">
+                  <p className="font-bold text-[#0F1F5C] dark:text-white">
+                    Server Environment Credential Status (.env)
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {[
+                      { label: 'Gmail SMTP', ok: overview.envCredentialStatus.smtpConfigured },
+                      { label: 'Resend API', ok: overview.envCredentialStatus.resendConfigured },
+                      { label: 'CallMeBot', ok: overview.envCredentialStatus.callmebotConfigured },
+                      { label: 'Meta Cloud API', ok: overview.envCredentialStatus.cloudapiConfigured },
+                      { label: 'Twilio', ok: overview.envCredentialStatus.twilioConfigured },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className={`rounded-lg border px-2.5 py-2 font-semibold flex items-center justify-between ${
+                          item.ok
+                            ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
+                            : 'border-[#D7E4FF] text-[var(--muted)] dark:border-[#264096]'
+                        }`}
+                      >
+                        <span>{item.label}</span>
+                        <span>{item.ok ? 'Set' : 'Missing'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={notifSaving}
+                className="btn-red-pill px-6 py-2.5 text-xs cursor-pointer disabled:opacity-60"
+              >
+                {notifSaving ? 'Saving…' : 'Save Notification Settings'}
+              </button>
+            </form>
           </div>
         )}
 
@@ -2939,6 +4752,658 @@ export function AdminDashboardPage({
           </div>
         )}
       </div>
+
+      {/* VIEW BOOKING MODAL */}
+      {viewingBooking && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-view-booking-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F1F5C]/70 backdrop-blur-xs p-4"
+          onClick={() => setViewingBooking(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-6 shadow-2xl space-y-5 text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-[#D7E4FF] dark:border-[#264096] pb-4">
+              <div>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="font-mono font-bold text-base text-[#1F3FA8] dark:text-[#FFC93C]">
+                    {viewingBooking.booking_code}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase ${getStatusBadgeClass(
+                      viewingBooking.status
+                    )}`}
+                  >
+                    {viewingBooking.status}
+                  </span>
+                </div>
+                <h2 id="admin-view-booking-title" className="font-display font-bold text-lg mt-1">
+                  {viewingBooking.customer_name} · {viewingBooking.product_name}
+                </h2>
+                <p className="text-[11px] text-[var(--muted)]">
+                  Created: {viewingBooking.created_at} · Updated: {viewingBooking.updated_at}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingBooking(null)}
+                aria-label="Close booking details"
+                className="p-1.5 rounded-full hover:bg-[var(--bg)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Customer Contact</p>
+                <p className="font-semibold text-sm">{viewingBooking.customer_name}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[var(--muted)]">Phone:</span>
+                  <CallLink phone={viewingBooking.phone} className="font-mono font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline" />
+                </div>
+                {viewingBooking.email && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[var(--muted)]">Email:</span>
+                    <EmailLink email={viewingBooking.email} className="font-mono text-[#1F3FA8] dark:text-[#FFC93C] hover:underline" />
+                  </div>
+                )}
+                {viewingBooking.gst_number && (
+                  <p>
+                    <span className="text-[var(--muted)]">GSTIN:</span>{' '}
+                    <span className="font-mono">{viewingBooking.gst_number}</span>
+                  </p>
+                )}
+                <div className="pt-1">
+                  <a
+                    href={buildWhatsAppUrl(
+                      viewingBooking.phone,
+                      `Namaskara ${viewingBooking.customer_name}, regarding your MY CONCRETE booking ${viewingBooking.booking_code} (${viewingBooking.grade}, Qty: ${viewingBooking.quantity_m3} ${viewingBooking.unit_type === 'pieces' ? 'pieces' : 'm³'}, Date: ${viewingBooking.delivery_date} ${viewingBooking.slot_label}).`
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#16A34A] hover:brightness-110 text-white px-2.5 py-1.5 font-semibold"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp Customer</span>
+                  </a>
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Schedule &amp; Mix Specs</p>
+                <p>
+                  <span className="text-[var(--muted)]">Grade:</span>{' '}
+                  <strong>{viewingBooking.grade}</strong> ·{' '}
+                  <strong>
+                    {Number(viewingBooking.quantity_m3).toLocaleString('en-IN')}{' '}
+                    {viewingBooking.unit_type === 'pieces' ? 'pieces' : 'm³'}
+                  </strong>
+                </p>
+                <p>
+                  <span className="text-[var(--muted)]">Delivery:</span>{' '}
+                  <strong className="tabular-nums">{viewingBooking.delivery_date}</strong> ({viewingBooking.slot_label})
+                </p>
+                <p>
+                  <span className="text-[var(--muted)]">Usage &amp; Slump:</span> {viewingBooking.usage_type} ·{' '}
+                  {viewingBooking.slump_mm}
+                </p>
+                {viewingBooking.unit_type !== 'pieces' && (
+                  <p>
+                    <span className="text-[var(--muted)]">Pump:</span>{' '}
+                    <span className="uppercase font-semibold">{viewingBooking.pump_type}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-1.5">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Delivery Site</p>
+                <p className="font-semibold">{viewingBooking.site_address}</p>
+                {viewingBooking.landmark && (
+                  <p className="text-[var(--muted)]">Landmark: {viewingBooking.landmark}</p>
+                )}
+                <p className="text-[var(--muted)]">
+                  City/Taluk: {viewingBooking.city} · Distance from{' '}
+                  {viewingBooking.dispatch_plant_name || 'Kotihal'} plant: {viewingBooking.distance_km} km
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-1.5 tabular-nums">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">Indicative Estimate</p>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted)]">Material:</span>
+                  <span>INR {Number(viewingBooking.estimated_concrete_amount || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted)]">Delivery Fee:</span>
+                  <span>INR {Number(viewingBooking.estimated_delivery_fee || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[var(--muted)]">Pump Fee:</span>
+                  <span>INR {Number(viewingBooking.estimated_pump_fee || 0).toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between border-t border-[#D7E4FF] dark:border-[#264096] pt-1 font-bold text-sm">
+                  <span>Estimated Total:</span>
+                  <span>INR {Number(viewingBooking.estimated_total || 0).toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+
+            {viewingBooking.notes && (
+              <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)] mb-1">Notes</p>
+                <p className="whitespace-pre-wrap">{viewingBooking.notes}</p>
+              </div>
+            )}
+
+            {(() => {
+              const liveBooking =
+                overview?.bookings.find((item) => item.id === viewingBooking.id) || viewingBooking;
+              const emailSt = liveBooking.email_status || 'pending';
+              const waSt = liveBooking.whatsapp_status || 'pending';
+              return (
+                <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      Owner Notification Delivery ({liveBooking.language === 'kn' ? 'Kannada' : 'English'})
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${getDeliveryStatusClass(emailSt)}`}>
+                        Email: {emailSt}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${getDeliveryStatusClass(waSt)}`}>
+                        WhatsApp: {waSt}
+                      </span>
+                      {liveBooking.notified_at && (
+                        <span className="text-[11px] text-[var(--muted)]">
+                          Last attempt: {liveBooking.notified_at}
+                        </span>
+                      )}
+                    </div>
+                    {(liveBooking.email_error || liveBooking.whatsapp_error) && (
+                      <p className="text-[11px] text-red-600 dark:text-red-300">
+                        {[liveBooking.email_error, liveBooking.whatsapp_error].filter(Boolean).join(' | ')}
+                      </p>
+                    )}
+                  </div>
+                  {isOwner && (
+                    <button
+                      type="button"
+                      disabled={resendingKey === `booking:${liveBooking.id}`}
+                      onClick={() => resendLeadNotification('booking', liveBooking.id)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-[#D7E4FF] dark:border-[#264096] px-3 py-1.5 font-semibold hover:border-[#1F3FA8] cursor-pointer disabled:opacity-60"
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 ${resendingKey === `booking:${liveBooking.id}` ? 'animate-spin' : ''}`}
+                      />
+                      <span>Resend notification</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#D7E4FF] dark:border-[#264096] pt-4">
+              <div className="flex flex-wrap gap-2">
+                {viewingBooking.status !== 'approved' && viewingBooking.status !== 'completed' && viewingBooking.status !== 'cancelled' && (
+                  <button
+                    type="button"
+                    disabled={bookingActionBusy}
+                    onClick={() => updateBooking(viewingBooking.id, { status: 'approved' })}
+                    className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 font-semibold cursor-pointer"
+                  >
+                    Approve
+                  </button>
+                )}
+                {viewingBooking.status !== 'dispatched' && viewingBooking.status !== 'completed' && viewingBooking.status !== 'cancelled' && (
+                  <button
+                    type="button"
+                    disabled={bookingActionBusy}
+                    onClick={() => updateBooking(viewingBooking.id, { status: 'dispatched' })}
+                    className="rounded-xl bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 font-semibold cursor-pointer"
+                  >
+                    Mark Dispatched
+                  </button>
+                )}
+                {viewingBooking.status !== 'completed' && viewingBooking.status !== 'cancelled' && (
+                  <button
+                    type="button"
+                    disabled={bookingActionBusy}
+                    onClick={() => updateBooking(viewingBooking.id, { status: 'completed' })}
+                    className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 font-semibold cursor-pointer"
+                  >
+                    Mark Completed
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const b = viewingBooking;
+                    setViewingBooking(null);
+                    openEditBookingModal(b);
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#1F3FA8] hover:bg-[#173187] text-white px-3.5 py-2 font-semibold cursor-pointer"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Edit Appointment</span>
+                </button>
+                {viewingBooking.status !== 'cancelled' && viewingBooking.status !== 'completed' && (
+                  confirmCancelBookingId === viewingBooking.id ? (
+                    <div className="inline-flex items-center gap-2 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-300 px-3 py-1.5">
+                      <button
+                        type="button"
+                        disabled={bookingActionBusy}
+                        onClick={() => updateBooking(viewingBooking.id, { status: 'cancelled' })}
+                        className="text-red-700 dark:text-red-300 font-bold hover:underline cursor-pointer"
+                      >
+                        Confirm Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCancelBookingId(null)}
+                        className="text-[var(--muted)] hover:underline cursor-pointer"
+                      >
+                        Keep
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmCancelBookingId(viewingBooking.id)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-300 text-red-600 dark:text-red-300 px-3.5 py-2 font-semibold hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                      <span>Cancel</span>
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT BOOKING MODAL */}
+      {editingBooking && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-edit-booking-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F1F5C]/70 backdrop-blur-xs p-4"
+          onClick={() => setEditingBooking(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-6 shadow-2xl space-y-4 text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#D7E4FF] dark:border-[#264096] pb-3">
+              <div>
+                <p className="font-mono font-bold text-[#1F3FA8] dark:text-[#FFC93C]">{editingBooking.booking_code}</p>
+                <h2 id="admin-edit-booking-title" className="font-display font-bold text-lg">
+                  Edit Appointment &amp; Dispatch Details
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingBooking(null)}
+                aria-label="Close edit modal"
+                className="p-1.5 rounded-full hover:bg-[var(--bg)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={saveBookingEdit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Customer Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBookingForm.customerName}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, customerName: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Mobile Number (10 digits)</label>
+                  <input
+                    type="tel"
+                    required
+                    value={editBookingForm.phone}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, phone: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Email (optional)</label>
+                  <input
+                    type="email"
+                    value={editBookingForm.email}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, email: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">GSTIN (optional)</label>
+                  <input
+                    type="text"
+                    value={editBookingForm.gstNumber}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, gstNumber: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Delivery Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={editBookingForm.deliveryDate}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, deliveryDate: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">24/7 Delivery Slot</label>
+                  <select
+                    value={editBookingForm.slotId}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, slotId: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  >
+                    {(siteData?.schedulingConfig?.slots || []).map((sl) => (
+                      <option key={sl.id} value={sl.id}>
+                        {sl.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Status</label>
+                  <select
+                    value={editBookingForm.status}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, status: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  >
+                    <option value="confirmed">Confirmed</option>
+                    <option value="waitlisted">Waitlisted</option>
+                    <option value="approved">Approved</option>
+                    <option value="dispatched">Dispatched</option>
+                    <option value="completed">Completed</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Grade / Size</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBookingForm.grade}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, grade: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">
+                    Quantity ({editingBooking.unit_type === 'pieces' ? 'pieces' : 'm³'})
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    step={editingBooking.unit_type === 'pieces' ? 1 : 0.5}
+                    required
+                    value={editBookingForm.quantityM3}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, quantityM3: Number(e.target.value) })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Slump / Spec</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBookingForm.slumpMm}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, slumpMm: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                {editingBooking.unit_type !== 'pieces' && (
+                  <div>
+                    <label className="block text-[var(--muted)] mb-1">Pump Requirement</label>
+                    <select
+                      value={editBookingForm.pumpType}
+                      onChange={(e) =>
+                        setEditBookingForm({
+                          ...editBookingForm,
+                          pumpType: e.target.value as 'none' | 'line' | 'boom',
+                        })
+                      }
+                      className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                    >
+                      <option value="none">No Pump (Direct Chute)</option>
+                      <option value="line">Line Pump</option>
+                      <option value="boom">Boom Pump</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-[var(--muted)] mb-1">Site Address</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBookingForm.siteAddress}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, siteAddress: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">City / Taluk</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBookingForm.city}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, city: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Landmark (optional)</label>
+                  <input
+                    type="text"
+                    value={editBookingForm.landmark}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, landmark: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[var(--muted)] mb-1">Usage Type</label>
+                  <input
+                    type="text"
+                    required
+                    value={editBookingForm.usageType}
+                    onChange={(e) => setEditBookingForm({ ...editBookingForm, usageType: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[var(--muted)] mb-1">Dispatch / Customer Notes</label>
+                <textarea
+                  rows={2}
+                  value={editBookingForm.notes}
+                  onChange={(e) => setEditBookingForm({ ...editBookingForm, notes: e.target.value })}
+                  className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+              </div>
+
+              {bookingModalError && <p className="text-red-600 font-semibold">{bookingModalError}</p>}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#D7E4FF] dark:border-[#264096]">
+                <button
+                  type="button"
+                  onClick={() => setEditingBooking(null)}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] px-4 py-2 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={bookingActionBusy}
+                  className="btn-orange-pill px-5 py-2 font-semibold disabled:opacity-60 cursor-pointer"
+                >
+                  {bookingActionBusy ? 'Saving...' : 'Save Appointment Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT SITE VISIT MODAL */}
+      {editingVisit && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="admin-edit-visit-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F1F5C]/70 backdrop-blur-xs p-4"
+          onClick={() => setEditingVisit(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-6 shadow-2xl space-y-4 text-xs"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#D7E4FF] dark:border-[#264096] pb-3">
+              <div>
+                <p className="font-mono font-bold text-[#1F3FA8] dark:text-[#FFC93C]">{editingVisit.visit_code}</p>
+                <h2 id="admin-edit-visit-title" className="font-display font-bold text-lg">
+                  Edit Site / Plant Visit Appointment
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingVisit(null)}
+                aria-label="Close site visit edit modal"
+                className="p-1.5 rounded-full hover:bg-[var(--bg)] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={saveSiteVisitEdit} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Visitor Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={editVisitForm.customerName}
+                    onChange={(e) => setEditVisitForm({ ...editVisitForm, customerName: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Phone</label>
+                  <input
+                    type="tel"
+                    required
+                    value={editVisitForm.phone}
+                    onChange={(e) => setEditVisitForm({ ...editVisitForm, phone: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Preferred Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={editVisitForm.preferredDate}
+                    onChange={(e) => setEditVisitForm({ ...editVisitForm, preferredDate: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Preferred Time</label>
+                  <input
+                    type="text"
+                    required
+                    value={editVisitForm.preferredTime}
+                    onChange={(e) => setEditVisitForm({ ...editVisitForm, preferredTime: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={editVisitForm.location}
+                    onChange={(e) => setEditVisitForm({ ...editVisitForm, location: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[var(--muted)] mb-1">Status</label>
+                  <select
+                    value={editVisitForm.status}
+                    onChange={(e) => setEditVisitForm({ ...editVisitForm, status: e.target.value })}
+                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                  >
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[var(--muted)] mb-1">Notes</label>
+                <textarea
+                  rows={2}
+                  value={editVisitForm.notes}
+                  onChange={(e) => setEditVisitForm({ ...editVisitForm, notes: e.target.value })}
+                  className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2"
+                />
+              </div>
+
+              {visitModalError && <p className="text-red-600 font-semibold">{visitModalError}</p>}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#D7E4FF] dark:border-[#264096]">
+                <button
+                  type="button"
+                  onClick={() => setEditingVisit(null)}
+                  className="rounded-xl border border-[#D7E4FF] dark:border-[#264096] px-4 py-2 font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={visitActionBusy}
+                  className="btn-orange-pill px-5 py-2 font-semibold disabled:opacity-60 cursor-pointer"
+                >
+                  {visitActionBusy ? 'Saving...' : 'Save Visit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

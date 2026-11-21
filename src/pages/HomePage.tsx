@@ -23,6 +23,7 @@ import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { FRIENDLY_API_ERROR, parseJsonResponse } from '../utils/api.ts';
 import { VisualPlate } from '../components/VisualPlate.tsx';
+import { CallLink } from '../components/ContactLinks.tsx';
 import { DiamondMosaic } from '../components/DiamondMosaic.tsx';
 import { ConnectForm } from '../components/ConnectForm.tsx';
 import { WaveDivider } from '../components/WaveDivider.tsx';
@@ -109,6 +110,7 @@ export function HomePage() {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterHoneypot, setNewsletterHoneypot] = useState('');
   const [newsletterStatus, setNewsletterStatus] = useState<string | null>(null);
+  const [newsletterWhatsappUrl, setNewsletterWhatsappUrl] = useState<string | null>(null);
   const touchStartXRef = useRef<number | null>(null);
   const prefersReducedMotion = useReducedMotion();
 
@@ -120,42 +122,85 @@ export function HomePage() {
   const stats = data?.statsItems || [];
   const testimonials = data?.testimonials || [];
 
+  const plantLocations =
+    data?.plantLocations && data.plantLocations.length > 0
+      ? data.plantLocations
+      : [
+          {
+            id: 'kotihal',
+            name: biz?.businessName || 'MY CONCRETE – Readymix Concrete Unit (Kotihal)',
+            shortLabel: 'Kotihal',
+            address: biz?.address || 'FM66+2X6, Kotihal, Karnataka 581119',
+            city: 'Ranebennur',
+            postalCode: '581119',
+            lat: biz?.plantLat || 14.4607,
+            lng: biz?.plantLng || 75.6633,
+            phone: biz?.phone || '+91 73378 07372',
+            whatsapp: biz?.whatsapp || biz?.phone || '+91 73378 07372',
+            hours: biz?.workingHours || 'Open 24 Hours (All Days)',
+            serviceRadiusKm: biz?.serviceRadiusKm || 50,
+            googleMapsUrl: biz?.googleMapsUrl || 'https://share.google/oZzcrYosJ0JYw2tTn',
+            pinColor: 'blue' as const,
+            isPrimary: true,
+          },
+          {
+            id: 'davangere',
+            name: 'MY CONCRETE – Davangere Unit',
+            shortLabel: 'Davangere',
+            address: 'Davangere, Karnataka 577001',
+            city: 'Davangere',
+            postalCode: '577001',
+            lat: 14.4644,
+            lng: 75.9218,
+            phone: '+91 73378 07372',
+            whatsapp: '+91 73378 07372',
+            hours: 'Open 24 Hours (All Days)',
+            serviceRadiusKm: 50,
+            googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+            pinColor: 'red' as const,
+            isPrimary: false,
+          },
+        ];
+
+  const sameAsLinks = [
+    biz?.facebookUrl || 'https://www.facebook.com/MyConcretekotihal',
+    biz?.instagramUrl || 'https://www.instagram.com/myconcretektl?knvt=cGttbzg1NGJ0N3o3',
+    biz?.youtubeUrl,
+    biz?.linkedinUrl,
+  ].filter(Boolean);
+
   useDocumentMeta({
     title: 'MY CONCRETE – Readymix Concrete Unit | Ranebennur & Davangere',
     description:
-      'All Ready Mix Concrete (M5–M40+) & Cement Bricks in Ranebennur and Davangere, Karnataka. Open 24 hours at Kotihal. Calculate volume or bricks and book delivery online.',
+      'All Ready Mix Concrete (M5–M40+) & Cement Bricks in Ranebennur and Davangere, Karnataka. Open 24 hours at Kotihal & Davangere. Calculate volume or bricks and book delivery online.',
     jsonLd: [
-      {
+      ...plantLocations.map((loc) => ({
         '@context': 'https://schema.org',
         '@type': 'LocalBusiness',
-        name: biz?.businessName || 'MY CONCRETE – Readymix Concrete Unit',
+        name: loc.name,
+        branchCode: loc.id,
         description:
-          'Ready-mix concrete (M5–M40+) and cement bricks unit open 24 hours in Kotihal, serving Ranebennur and Davangere, Karnataka.',
+          'Ready-mix concrete (M5–M40+) and cement bricks unit open 24 hours serving Ranebennur and Davangere, Karnataka.',
         address: {
           '@type': 'PostalAddress',
-          streetAddress: biz?.address || 'FM66+2X6, Kotihal, Karnataka 581119',
-          addressLocality: 'Kotihal, Ranebennur',
+          streetAddress: loc.address,
+          addressLocality: loc.city,
           addressRegion: 'Karnataka',
-          postalCode: '581119',
+          postalCode: loc.postalCode,
           addressCountry: 'IN',
         },
         geo: {
           '@type': 'GeoCoordinates',
-          latitude: biz?.plantLat || 14.4607,
-          longitude: biz?.plantLng || 75.6633,
+          latitude: loc.lat,
+          longitude: loc.lng,
         },
-        telephone: biz?.phone || '+91 73378 07372',
+        telephone: loc.phone || biz?.phone || '+91 73378 07372',
         email: biz?.email || 'myconcretektl@gmail.com',
-        hasMap: biz?.googleMapsUrl || 'https://share.google/oZzcrYosJ0JYw2tTn',
-        sameAs: [
-          biz?.facebookUrl || 'https://www.facebook.com/MyConcretekotihal',
-          biz?.instagramUrl || 'https://www.instagram.com/myconcretektl?knvt=cGttbzg1NGJ0N3o3',
-          biz?.youtubeUrl,
-          biz?.linkedinUrl,
-        ].filter(Boolean),
+        hasMap: loc.googleMapsUrl,
+        sameAs: sameAsLinks,
         openingHours: 'Mo-Su 00:00-23:59',
         areaServed: ['Ranebennur', 'Davangere', 'Kotihal', 'Harihar', 'Byadgi', 'Haveri'],
-      },
+      })),
       {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
@@ -188,19 +233,33 @@ export function HomePage() {
   async function handleNewsletter(e: React.FormEvent) {
     e.preventDefault();
     setNewsletterStatus(null);
+    setNewsletterWhatsappUrl(null);
     try {
       const res = await fetch('/api/newsletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: newsletterEmail, website_url: newsletterHoneypot }),
+        body: JSON.stringify({
+          email: newsletterEmail,
+          language: lang,
+          website_url: newsletterHoneypot,
+        }),
       });
-      const { data: json, isJson } = await parseJsonResponse<{ ok?: boolean; error?: string }>(res);
+      const { data: json, isJson } = await parseJsonResponse<{
+        ok?: boolean;
+        subCode?: string;
+        whatsappUrl?: string;
+        error?: string;
+      }>(res);
       if (!isJson || !json) {
         setNewsletterStatus(FRIENDLY_API_ERROR);
         return;
       }
       if (res.ok) {
-        setNewsletterStatus('Subscribed! Thank you for connecting with MY CONCRETE.');
+        const refPart = json.subCode ? `Reference ID: ${json.subCode} · ` : '';
+        setNewsletterStatus(
+          `${refPart}Subscribed! Our team will call you shortly if you shared a request.`
+        );
+        if (json.whatsappUrl) setNewsletterWhatsappUrl(json.whatsappUrl);
         setNewsletterEmail('');
       } else {
         setNewsletterStatus(json.error || 'Could not subscribe.');
@@ -1035,25 +1094,93 @@ export function HomePage() {
 
       <WaveDivider topColor="var(--bg-soft)" bottomColor="var(--bg)" flip />
 
-      {/* 10. SERVICE AREA MAP (Kotihal Plant -> Ranebennur & Davangere) */}
+      {/* 10. SERVICE AREA MAP (Kotihal & Davangere Units -> Ranebennur & Davangere) */}
       <section className="bg-[var(--bg)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-5 space-y-5">
-            <p className="text-xs font-semibold text-[#D92B25]">Live Plant & Delivery Radius</p>
+          <div className="lg:col-span-5 space-y-4">
+            <p className="text-xs font-semibold text-[#D92B25]">Live Plant &amp; Delivery Radius</p>
             <h2 className="font-display font-bold text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white">
               {t('serviceAreaTitle')}
             </h2>
             <p className="text-sm text-[var(--muted)] leading-relaxed">
-              Dispatched from <strong>{biz?.address}</strong> within a{' '}
+              Dispatched from our Kotihal &amp; Davangere units within a{' '}
               <strong className="tabular-nums">{biz?.serviceRadiusKm || 50} km</strong> corridor covering Ranebennur, Davangere, Harihar, Byadgi, and Haveri.
             </p>
-            <div className="rounded-[16px] bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-1.5 text-xs">
-              <p className="font-semibold text-[#0F1F5C] dark:text-white flex items-center gap-2">
-                <Award className="w-4 h-4 text-[#D92B25]" />
-                <span>24-Hour Dispatch Desk: {biz?.phone || '+91 73378 07372'}</span>
+
+            <div className="space-y-3">
+              {plantLocations.map((loc) => {
+                const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
+                const locDirections =
+                  loc.googleMapsUrl ||
+                  `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+                return (
+                  <div
+                    key={loc.id}
+                    className="rounded-[16px] bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-2 text-xs"
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span
+                        className={`inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-full text-[10px] font-extrabold text-white mt-0.5 ${
+                          isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                        }`}
+                      >
+                        {isRed ? (
+                          <MapPin className="w-3.5 h-3.5" />
+                        ) : (
+                          'MC'
+                        )}
+                      </span>
+                      <div className="min-w-0 space-y-0.5">
+                        <p className="font-display font-bold text-sm text-[#0F1F5C] dark:text-white">
+                          {loc.name}
+                        </p>
+                        <p className="text-[var(--muted)] leading-snug">{loc.address}</p>
+                        <p className="text-emerald-600 dark:text-emerald-400 font-semibold">{loc.hours}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 pl-8 pt-0.5">
+                      <CallLink
+                        phone={loc.phone || biz?.phone || '+91 73378 07372'}
+                        whatsapp={loc.whatsapp || loc.phone || biz?.whatsapp || '+91 73378 07372'}
+                        className="tabular-nums font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                      >
+                        {loc.phone}
+                      </CallLink>
+                      <a
+                        href={locDirections}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-semibold text-[#0F1F5C] dark:text-slate-200 hover:text-[#D92B25]"
+                      >
+                        <Navigation className="w-3 h-3" />
+                        <span>Get Directions</span>
+                      </a>
+                      <Link
+                        to={`/book?plant=${encodeURIComponent(loc.id)}`}
+                        className="font-semibold text-[#D92B25] hover:underline"
+                      >
+                        Book Delivery &rarr;
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="rounded-[16px] bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-3.5 space-y-1 text-xs">
+              <p className="font-semibold text-[#0F1F5C] dark:text-white flex flex-wrap items-center gap-2">
+                <Award className="w-4 h-4 text-[#D92B25] shrink-0" />
+                <span>24-Hour Dispatch Desk:</span>
+                <CallLink
+                  phone={biz?.phone || '+91 73378 07372'}
+                  whatsapp={biz?.whatsapp || biz?.phone || '+91 73378 07372'}
+                  className="tabular-nums text-[#1F3FA8] dark:text-[#FFC93C] hover:underline inline-flex items-center min-h-[44px] md:min-h-0"
+                >
+                  {biz?.phone || '+91 73378 07372'}
+                </CallLink>
               </p>
               <p className="text-[var(--muted)]">
-                Pin your exact delivery spot in the booking wizard to auto-check distance from Kotihal.
+                Pin your exact delivery spot in the booking wizard to auto-check distance from either unit.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -1083,8 +1210,9 @@ export function HomePage() {
                 serviceRadiusKm={biz.serviceRadiusKm}
                 plantName={biz.businessName}
                 plantAddress={biz.address}
+                locations={plantLocations}
                 googleMapsUrl={biz.googleMapsUrl}
-                heightClass="h-[360px]"
+                heightClass="h-[400px]"
               />
             )}
           </div>
@@ -1253,7 +1381,19 @@ export function HomePage() {
                 </button>
               </form>
               {newsletterStatus && (
-                <p className="text-xs font-medium text-[#16A34A]">{newsletterStatus}</p>
+                <div className="space-y-2 pt-1">
+                  <p className="text-xs font-medium text-[#16A34A]">{newsletterStatus}</p>
+                  {newsletterWhatsappUrl && (
+                    <a
+                      href={newsletterWhatsappUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full bg-[#16A34A] hover:brightness-110 text-white px-3.5 py-1.5 text-xs font-semibold"
+                    >
+                      <span>Send on WhatsApp</span>
+                    </a>
+                  )}
+                </div>
               )}
             </div>
 

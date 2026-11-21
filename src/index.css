@@ -278,3 +278,22 @@
   font-family: var(--font-sans);
   z-index: 1;
 }
+
+.top-phone,
+.top-email {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  text-decoration: none;
+  position: relative;
+  z-index: 50;
+  pointer-events: auto;
+}
+
+.top-phone:hover,
+.top-email:hover {
+  color: #ffc93c;
+}
+

@@ -82,6 +82,13 @@ export function initSchema(): void {
       gst_number TEXT DEFAULT '',
       notes TEXT DEFAULT '',
       status TEXT NOT NULL DEFAULT 'confirmed',
+      language TEXT NOT NULL DEFAULT 'en',
+      is_read INTEGER NOT NULL DEFAULT 0,
+      email_status TEXT NOT NULL DEFAULT 'pending',
+      email_error TEXT DEFAULT '',
+      whatsapp_status TEXT NOT NULL DEFAULT 'pending',
+      whatsapp_error TEXT DEFAULT '',
+      notified_at TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -104,6 +111,13 @@ export function initSchema(): void {
       attachment_name TEXT DEFAULT '',
       attachment_data TEXT DEFAULT '',
       status TEXT NOT NULL DEFAULT 'new',
+      language TEXT NOT NULL DEFAULT 'en',
+      is_read INTEGER NOT NULL DEFAULT 0,
+      email_status TEXT NOT NULL DEFAULT 'pending',
+      email_error TEXT DEFAULT '',
+      whatsapp_status TEXT NOT NULL DEFAULT 'pending',
+      whatsapp_error TEXT DEFAULT '',
+      notified_at TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -119,11 +133,19 @@ export function initSchema(): void {
       email TEXT DEFAULT '',
       notes TEXT DEFAULT '',
       status TEXT NOT NULL DEFAULT 'scheduled',
+      language TEXT NOT NULL DEFAULT 'en',
+      is_read INTEGER NOT NULL DEFAULT 0,
+      email_status TEXT NOT NULL DEFAULT 'pending',
+      email_error TEXT DEFAULT '',
+      whatsapp_status TEXT NOT NULL DEFAULT 'pending',
+      whatsapp_error TEXT DEFAULT '',
+      notified_at TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS enquiries (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      enquiry_code TEXT DEFAULT '',
       type TEXT NOT NULL DEFAULT 'contact',
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
@@ -133,12 +155,28 @@ export function initSchema(): void {
       message TEXT NOT NULL,
       consent INTEGER NOT NULL DEFAULT 1,
       status TEXT NOT NULL DEFAULT 'new',
+      language TEXT NOT NULL DEFAULT 'en',
+      is_read INTEGER NOT NULL DEFAULT 0,
+      email_status TEXT NOT NULL DEFAULT 'pending',
+      email_error TEXT DEFAULT '',
+      whatsapp_status TEXT NOT NULL DEFAULT 'pending',
+      whatsapp_error TEXT DEFAULT '',
+      notified_at TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE TABLE IF NOT EXISTS newsletter_subscribers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sub_code TEXT DEFAULT '',
       email TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'new',
+      language TEXT NOT NULL DEFAULT 'en',
+      is_read INTEGER NOT NULL DEFAULT 0,
+      email_status TEXT NOT NULL DEFAULT 'pending',
+      email_error TEXT DEFAULT '',
+      whatsapp_status TEXT NOT NULL DEFAULT 'pending',
+      whatsapp_error TEXT DEFAULT '',
+      notified_at TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -194,6 +232,9 @@ export function initSchema(): void {
       subject TEXT NOT NULL,
       body_preview TEXT NOT NULL,
       delivery_mode TEXT NOT NULL,
+      channel TEXT DEFAULT 'email',
+      reference_code TEXT DEFAULT '',
+      error_detail TEXT DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -260,26 +301,62 @@ export function initSchema(): void {
     );
   `);
 
-  // Safe column migrations for existing DB files
-  const prodCols = db.prepare(`PRAGMA table_info(products)`).all() as Array<{ name: string }>;
-  if (!prodCols.some((c) => c.name === 'unit_type')) {
-    db.exec(`ALTER TABLE products ADD COLUMN unit_type TEXT NOT NULL DEFAULT 'm3'`);
-  }
-  const bookCols = db.prepare(`PRAGMA table_info(bookings)`).all() as Array<{ name: string }>;
-  if (!bookCols.some((c) => c.name === 'unit_type')) {
-    db.exec(`ALTER TABLE bookings ADD COLUMN unit_type TEXT NOT NULL DEFAULT 'm3'`);
-  }
-  const adminCols = db.prepare(`PRAGMA table_info(admin_users)`).all() as Array<{ name: string }>;
-  if (!adminCols.some((c) => c.name === 'name')) {
-    db.exec(`ALTER TABLE admin_users ADD COLUMN name TEXT NOT NULL DEFAULT 'Plant Admin'`);
-  }
-  if (!adminCols.some((c) => c.name === 'must_change_password')) {
-    db.exec(`ALTER TABLE admin_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 1`);
-  }
-  if (!adminCols.some((c) => c.name === 'two_factor_enabled')) {
-    db.exec(`ALTER TABLE admin_users ADD COLUMN two_factor_enabled INTEGER NOT NULL DEFAULT 0`);
-  }
-  if (!adminCols.some((c) => c.name === 'last_login_at')) {
-    db.exec(`ALTER TABLE admin_users ADD COLUMN last_login_at TEXT DEFAULT ''`);
-  }
+  const ensureColumns = (table: string, colsToAdd: Array<[string, string]>) => {
+    const existing = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    for (const [colName, colDef] of colsToAdd) {
+      if (!existing.some((c) => c.name === colName)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${colName} ${colDef}`);
+      }
+    }
+  };
+
+  ensureColumns('products', [['unit_type', `TEXT NOT NULL DEFAULT 'm3'`]]);
+
+  const leadNotificationCols: Array<[string, string]> = [
+    ['language', `TEXT NOT NULL DEFAULT 'en'`],
+    ['is_read', `INTEGER NOT NULL DEFAULT 0`],
+    ['email_status', `TEXT NOT NULL DEFAULT 'pending'`],
+    ['email_error', `TEXT DEFAULT ''`],
+    ['whatsapp_status', `TEXT NOT NULL DEFAULT 'pending'`],
+    ['whatsapp_error', `TEXT DEFAULT ''`],
+    ['notified_at', `TEXT DEFAULT ''`],
+  ];
+
+  ensureColumns('bookings', [
+    ['unit_type', `TEXT NOT NULL DEFAULT 'm3'`],
+    ['dispatch_plant', `TEXT NOT NULL DEFAULT 'kotihal'`],
+    ['dispatch_plant_name', `TEXT NOT NULL DEFAULT 'Kotihal'`],
+    ...leadNotificationCols,
+  ]);
+  ensureColumns('quotes', leadNotificationCols);
+  ensureColumns('site_visits', leadNotificationCols);
+  ensureColumns('enquiries', [['enquiry_code', `TEXT DEFAULT ''`], ...leadNotificationCols]);
+  ensureColumns('newsletter_subscribers', [
+    ['sub_code', `TEXT DEFAULT ''`],
+    ['status', `TEXT NOT NULL DEFAULT 'new'`],
+    ...leadNotificationCols,
+  ]);
+  ensureColumns('email_logs', [
+    ['channel', `TEXT DEFAULT 'email'`],
+    ['reference_code', `TEXT DEFAULT ''`],
+    ['error_detail', `TEXT DEFAULT ''`],
+  ]);
+
+  ensureColumns('admin_users', [
+    ['name', `TEXT NOT NULL DEFAULT 'Plant Admin'`],
+    ['must_change_password', `INTEGER NOT NULL DEFAULT 1`],
+    ['two_factor_enabled', `INTEGER NOT NULL DEFAULT 0`],
+    ['last_login_at', `TEXT DEFAULT ''`],
+  ]);
+
+  // Backfill reference codes for legacy enquiries & newsletter subscribers if empty
+  const year = new Date().getFullYear();
+  db.exec(`
+    UPDATE enquiries
+    SET enquiry_code = 'ENQ-' || '${year}' || '-' || printf('%04d', id)
+    WHERE COALESCE(enquiry_code, '') = '';
+    UPDATE newsletter_subscribers
+    SET sub_code = 'NL-' || '${year}' || '-' || printf('%04d', id)
+    WHERE COALESCE(sub_code, '') = '';
+  `);
 }

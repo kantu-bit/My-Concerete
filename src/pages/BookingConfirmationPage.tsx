@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { CalendarPlus, CheckCircle2, Download, MessageCircle } from 'lucide-react';
+import { CalendarPlus, CheckCircle2, Download, Mail, MessageCircle, Phone } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { readApiJson } from '../utils/api.ts';
+import { CallLink } from '../components/ContactLinks.tsx';
 import {
   buildWhatsAppUrl,
   downloadBookingIcs,
@@ -22,7 +23,7 @@ export function BookingConfirmationPage() {
 
   useDocumentMeta({
     title: bookingCode ? `Booking ${bookingCode} | MY CONCRETE` : 'Booking Confirmation',
-    description: 'Download PDF receipt, .ics calendar file, or share your MY CONCRETE booking via WhatsApp.',
+    description: 'Download PDF receipt, .ics calendar file, or share your MY CONCRETE booking via WhatsApp or Email.',
   });
 
   useEffect(() => {
@@ -60,11 +61,36 @@ export function BookingConfirmationPage() {
   const biz = data?.businessConfig;
   const isPieces = booking.unit_type === 'pieces';
   const unitLabel = isPieces ? 'pieces' : 'm³';
+  const ownerEmail = biz?.email || 'myconcretektl@gmail.com';
+  const ownerWhatsapp = biz?.whatsapp || biz?.phone || '+91 73378 07372';
 
-  const whatsappUrl = buildWhatsAppUrl(
-    biz?.whatsapp || biz?.phone || '+91 73378 07372',
-    `Hi MY CONCRETE, I have submitted booking ${booking.booking_code} for ${booking.quantity_m3} ${unitLabel} of ${booking.grade} on ${booking.delivery_date} (${booking.slot_label}). Site: ${booking.site_address}, ${booking.city}.`
-  );
+  const fullBookingMessage = [
+    `*MY CONCRETE BOOKING: ${booking.booking_code}* (${booking.status.toUpperCase()})`,
+    booking.dispatch_plant_name ? `Delivery From: ${booking.dispatch_plant_name} Plant` : null,
+    `Customer: ${booking.customer_name}`,
+    `Mobile: +91 ${booking.phone}`,
+    booking.email ? `Email: ${booking.email}` : null,
+    booking.gst_number ? `GSTIN: ${booking.gst_number}` : null,
+    `Product & Grade: ${booking.grade} (${booking.product_name})`,
+    `Quantity: ${Number(booking.quantity_m3).toLocaleString('en-IN')} ${unitLabel}${
+      !isPieces
+        ? ` | Usage: ${booking.usage_type} | Slump: ${booking.slump_mm} | Pump: ${
+            booking.pump_type === 'none' ? 'Chute' : `${booking.pump_type.toUpperCase()} Pump`
+          }`
+        : ''
+    }`,
+    `Scheduled: ${booking.delivery_date} (${booking.slot_label})`,
+    `Site: ${booking.site_address}${booking.landmark ? ` (Near ${booking.landmark})` : ''}, ${booking.city} (~${booking.distance_km} km)`,
+    `Indicative Estimate: INR ${Number(booking.estimated_total).toLocaleString('en-IN')}`,
+    booking.notes ? `Notes: ${booking.notes}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const whatsappUrl = buildWhatsAppUrl(ownerWhatsapp, fullBookingMessage);
+  const mailtoUrl = `mailto:${ownerEmail}?subject=${encodeURIComponent(
+    `MY CONCRETE Booking ${booking.booking_code} – ${booking.customer_name}`
+  )}&body=${encodeURIComponent(fullBookingMessage)}`;
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-8">
@@ -73,10 +99,13 @@ export function BookingConfirmationPage() {
           <div className="flex items-start gap-3">
             <CheckCircle2 className="w-7 h-7 text-[#16A34A] shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-mono text-[var(--muted)]">Booking Reference</p>
+              <p className="text-xs font-mono text-[var(--muted)]">Booking Reference ID</p>
               <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white tabular-nums">
                 {booking.booking_code}
               </h1>
+              <p className="text-xs font-semibold text-[#16A34A] mt-1">
+                Our team will call you shortly to confirm dispatch.
+              </p>
             </div>
           </div>
           <span
@@ -107,8 +136,11 @@ export function BookingConfirmationPage() {
             <p className="font-semibold tabular-nums">{booking.delivery_date} ({booking.slot_label})</p>
           </div>
           <div>
-            <p className="text-xs text-[var(--muted)]">Delivery Site</p>
-            <p className="font-semibold">{booking.site_address}, {booking.city} ({booking.distance_km} km)</p>
+            <p className="text-xs text-[var(--muted)]">Delivery Site &amp; Dispatch Unit</p>
+            <p className="font-semibold">
+              {booking.site_address}, {booking.city} ({booking.distance_km} km
+              {booking.dispatch_plant_name ? ` from ${booking.dispatch_plant_name}` : ''})
+            </p>
           </div>
           <div>
             <p className="text-xs text-[var(--muted)]">Customer Contact</p>
@@ -127,6 +159,26 @@ export function BookingConfirmationPage() {
         </p>
 
         <div className="flex flex-wrap gap-3 pt-2">
+          <a
+            href={whatsappUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full bg-[#16A34A] text-white px-4 min-h-[44px] py-2.5 text-sm font-semibold hover:brightness-110"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>Send on WhatsApp</span>
+          </a>
+
+          <a
+            href={mailtoUrl}
+            target="_top"
+            rel="noopener"
+            className="inline-flex items-center gap-2 rounded-full bg-[#D92B25] text-white px-4 min-h-[44px] py-2.5 text-sm font-semibold hover:brightness-110"
+          >
+            <Mail className="w-4 h-4" />
+            <span>Send via Email</span>
+          </a>
+
           <button
             type="button"
             onClick={() => biz && downloadBookingPdf(booking, biz)}
@@ -145,15 +197,15 @@ export function BookingConfirmationPage() {
             <span>Add to Calendar (.ics)</span>
           </button>
 
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-full bg-[#16A34A] text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110"
+          <CallLink
+            phone={biz?.phone || '+91 73378 07372'}
+            whatsapp={ownerWhatsapp}
+            whatsappMessage={fullBookingMessage}
+            className="inline-flex items-center gap-2 rounded-full bg-[#0F1F5C] text-white px-4 min-h-[44px] py-2.5 text-sm font-semibold hover:bg-[#1F3FA8] transition-colors"
           >
-            <MessageCircle className="w-4 h-4" />
-            <span>Send via WhatsApp</span>
-          </a>
+            <Phone className="w-4 h-4 text-[#FFC93C]" />
+            <span className="tabular-nums">Call {biz?.phone || '+91 73378 07372'}</span>
+          </CallLink>
 
           <Link
             to="/track"
