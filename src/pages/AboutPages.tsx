@@ -5,6 +5,7 @@ import { useDocumentMeta } from '../utils/seo.ts';
 import { PlantMap } from '../components/PlantMap.tsx';
 import { ConnectForm } from '../components/ConnectForm.tsx';
 import { CallLink, MailLink } from '../components/ContactLinks.tsx';
+import { CONTACT_CONFIG } from '../config/contact.ts';
 
 function isKnown(val?: string): boolean {
   return Boolean(val && val.trim().length > 0 && !val.includes('[') && !val.includes(']'));
@@ -67,6 +68,51 @@ export function AboutStoryPage() {
           >
             Schedule a Plant Visit
           </Link>
+        </div>
+      </div>
+
+      {/* Sales Leadership & Corporate Office */}
+      <div className="warm-card p-6 sm:p-8 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+        <div className="md:col-span-6 rounded-[14px] overflow-hidden border border-[#D7E4FF] dark:border-[#264096] shadow-md bg-[#0F1F5C]">
+          <img
+            src={CONTACT_CONFIG.salesHead.visitingCardImage}
+            alt={`Visiting card of ${CONTACT_CONFIG.salesHead.name}, ${CONTACT_CONFIG.salesHead.role} at MY CONCRETE`}
+            width={1200}
+            height={675}
+            loading="lazy"
+            decoding="async"
+            className="w-full h-auto object-cover"
+          />
+        </div>
+        <div className="md:col-span-6 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#D92B25]">
+            Sales Leadership &amp; Corporate Office
+          </p>
+          <h2 className="font-display font-bold text-2xl text-[#0F1F5C] dark:text-white">
+            {CONTACT_CONFIG.salesHead.name}
+          </h2>
+          <p className="text-sm font-semibold text-[#1F3FA8] dark:text-[#FFC93C]">
+            {CONTACT_CONFIG.salesHead.role} · MY CONCRETE
+          </p>
+          <p className="text-sm text-[var(--muted)] leading-relaxed">
+            <strong className="text-[#0F1F5C] dark:text-white">Corporate Office:</strong>{' '}
+            {CONTACT_CONFIG.corporateOfficeAddress}
+          </p>
+          <div className="pt-1 flex flex-wrap items-center gap-4 text-sm">
+            <CallLink
+              phone={CONTACT_CONFIG.phoneDisplay}
+              whatsapp={CONTACT_CONFIG.whatsappDisplay}
+              className="tabular-nums font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+            >
+              {CONTACT_CONFIG.phoneDisplay}
+            </CallLink>
+            <MailLink
+              email={CONTACT_CONFIG.email}
+              className="font-semibold text-[#D92B25] hover:underline"
+            >
+              {CONTACT_CONFIG.email}
+            </MailLink>
+          </div>
         </div>
       </div>
     </div>

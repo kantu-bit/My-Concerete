@@ -4,6 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   ArrowRight,
   Award,
+  BadgeCheck,
   Blocks,
   Calculator,
   CheckCircle2,
@@ -29,6 +30,8 @@ import { DiamondMosaic } from '../components/DiamondMosaic.tsx';
 import { ConnectForm } from '../components/ConnectForm.tsx';
 import { WaveDivider } from '../components/WaveDivider.tsx';
 import { ServiceZoneExplorer } from '../components/ServiceZoneExplorer.tsx';
+import { CONTACT_CONFIG } from '../config/contact.ts';
+import { CompletedProjectsCarousel } from '../components/CompletedProjectsCarousel.tsx';
 
 function splitHeadlineLines(text: string, maxCharsPerLine = 22): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean);
@@ -678,6 +681,68 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* E.2) QUALITY ASSURANCE & TRUSTED AUTHORITY STRIP */}
+      <section aria-label="Quality Assurance Standards" className="bg-[var(--bg)] px-4 sm:px-6 pt-6">
+        <div className="max-w-[1260px] mx-auto rounded-[16px] bg-gradient-to-r from-[#0F1F5C] via-[#152972] to-[#1F3FA8] text-white border border-[#264096] shadow-[0_14px_34px_-12px_rgba(15,31,92,0.3)] px-5 py-4 sm:px-7 sm:py-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 items-center">
+            {[
+              {
+                icon: <BadgeCheck className="w-5 h-5 text-[#FFC93C]" />,
+                ring: 'bg-[#FFC93C]/15 border-[#FFC93C]/35',
+                title: lang === 'kn' ? 'ISO ಮತ್ತು IS-456 ಗುಣಮಟ್ಟ' : 'ISO & IS-456 Standards',
+                sub:
+                  lang === 'kn'
+                    ? 'ಕಂಪ್ಯೂಟರೀಕೃತ ವೇಯ್-ಬ್ಯಾಚಿಂಗ್ ಮತ್ತು ಶುದ್ಧ ಎಂ-ಸ್ಯಾಂಡ್'
+                    : 'Automated weigh-batching & graded M-sand',
+              },
+              {
+                icon: <Truck className="w-5 h-5 text-[#FFC93C]" />,
+                ring: 'bg-[#D92B25]/25 border-[#D92B25]/50',
+                title: lang === 'kn' ? 'ಸಮಯಕ್ಕೆ ಸರಿಯಾಗಿ ಡೆಲಿವರಿ ಭರವಸೆ' : 'Timely Delivery Guarantee',
+                sub:
+                  lang === 'kn'
+                    ? 'ಕೊಟಿಹಾಳ ಮತ್ತು ದಾವಣಗೆರೆಯಿಂದ ನಿಗದಿತ 2-ಗಂಟೆ ಸ್ಲಾಟ್'
+                    : 'Punctual 2-hr slots from Kotihal & Davangere',
+              },
+              {
+                icon: <Clock className="w-5 h-5 text-emerald-300" />,
+                ring: 'bg-emerald-500/20 border-emerald-400/40',
+                title: lang === 'kn' ? '24/7 ಹಗಲು-ರಾತ್ರಿ ಸೇವೆ' : '24/7 Service Availability',
+                sub:
+                  lang === 'kn'
+                    ? 'ಎಲ್ಲಾ ದಿನಗಳಲ್ಲಿ ಹಗಲು ಮತ್ತು ರಾತ್ರಿ ಸ್ಲ್ಯಾಬ್ ಪೂರೈಕೆ'
+                    : 'Open 24 hours all days for day & night pours',
+              },
+              {
+                icon: <ShieldCheck className="w-5 h-5 text-[#FFC93C]" />,
+                ring: 'bg-white/12 border-white/25',
+                title: lang === 'kn' ? 'ಪ್ರಾದೇಶಿಕ ವಿಶ್ವಾಸಾರ್ಹ ಘಟಕ' : 'Trusted Regional Authority',
+                sub:
+                  lang === 'kn'
+                    ? 'ಮನೆ, ವಾಣಿಜ್ಯ ಮತ್ತು ಸಾರ್ವಜನಿಕ ಕಾಮಗಾರಿಗಳ ನೆಚ್ಚಿನ ಆಯ್ಕೆ'
+                    : 'Preferred by builders across Ranebennur & Davangere',
+              },
+            ].map((item) => (
+              <div key={item.title} className="flex items-center gap-3.5 min-w-0">
+                <div
+                  className={`w-11 h-11 rounded-xl border flex items-center justify-center shrink-0 ${item.ring}`}
+                >
+                  {item.icon}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display font-bold text-sm text-white leading-tight truncate">
+                    {item.title}
+                  </p>
+                  <p className="text-xs text-slate-200/90 leading-snug mt-0.5 line-clamp-2">
+                    {item.sub}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* E.5) SEE OUR PLANT IN ACTION: 3-Photo Real MY CONCRETE Showcase */}
       <section className="bg-[var(--bg)] py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
@@ -1209,53 +1274,14 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* 7. COMPLETED PROJECTS GALLERY (Only rendered when real projects are added in Admin) */}
-      {projects.length > 0 && (
-        <>
-          <WaveDivider topColor="var(--bg)" bottomColor="var(--bg-soft)" />
-          <section className="bg-[var(--bg-soft)]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-                <div>
-                  <p className="text-xs font-semibold text-[#D92B25] mb-2">Regional Portfolio</p>
-                  <h2 className="font-display font-bold text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white">
-                    {t('completedProjects')}
-                  </h2>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {projects.slice(0, 4).map((proj) => (
-                  <div key={proj.id} className="warm-card overflow-hidden flex flex-col">
-                    <div className="h-44">
-                      <VisualPlate
-                        imageUrl={proj.image_url}
-                        variant="project"
-                        title={proj.title}
-                        subtitle={`${proj.segment} · ${proj.location}`}
-                      />
-                    </div>
-                    <div className="p-5 space-y-2 flex-1">
-                      <p className="text-xs text-[var(--muted)]">
-                        {proj.segment} · {proj.grade_used}
-                      </p>
-                      <h3 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
-                        {proj.title}
-                      </h3>
-                      <p className="text-xs text-[var(--muted)] leading-relaxed">{proj.summary}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        </>
-      )}
+      {/* 7. COMPLETED PROJECTS CAROUSEL */}
+      <WaveDivider topColor="var(--bg)" bottomColor="var(--bg-soft)" />
+      <CompletedProjectsCarousel projects={projects} sectionId="home-completed-projects" />
 
       {/* 8. NAVY STATS BAND WITH SUNNY YELLOW NUMBERS (Shown only when Admin enters real verified stats) */}
       {stats.length > 0 && (
         <>
-          <WaveDivider topColor={projects.length > 0 ? 'var(--bg-soft)' : 'var(--bg)'} bottomColor="#0F1F5C" />
+          <WaveDivider topColor="var(--bg-soft)" bottomColor="#0F1F5C" />
           <section className="bg-[#0F1F5C] text-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-14 grid grid-cols-2 lg:grid-cols-4 gap-8">
               {stats.map((st) => (
@@ -1275,12 +1301,6 @@ export function HomePage() {
       )}
 
       {/* 9. HOW IT WORKS (4 Steps) */}
-      {stats.length === 0 && (
-        <WaveDivider
-          topColor={projects.length > 0 ? 'var(--bg-soft)' : 'var(--bg)'}
-          bottomColor="var(--bg-soft)"
-        />
-      )}
       <section className="bg-[var(--bg-soft)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
           <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
@@ -1419,10 +1439,13 @@ export function HomePage() {
               <div className="space-y-1.5">
                 <p className="font-semibold text-[#0F1F5C] dark:text-white flex items-center gap-2 text-sm">
                   <Award className="w-4 h-4 text-[#D92B25] shrink-0" />
-                  <span>24-Hour Dispatch Desk</span>
+                  <span>Sales Head &amp; Corporate Office</span>
+                </p>
+                <p className="font-semibold text-[#1F3FA8] dark:text-[#FFC93C]">
+                  {CONTACT_CONFIG.salesHead.name} ({CONTACT_CONFIG.salesHead.role})
                 </p>
                 <p className="text-[var(--muted)] leading-relaxed">
-                  Need bulk fleet scheduling across Ranebennur, Davangere, or Harihar? Speak directly with our dispatch coordinator.
+                  {CONTACT_CONFIG.corporateOfficeAddress}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 pt-1">

@@ -8,6 +8,8 @@ import { VisualPlate } from '../components/VisualPlate.tsx';
 import { PlantMap } from '../components/PlantMap.tsx';
 import { CallLink, CopyPhoneButton, MailLink } from '../components/ContactLinks.tsx';
 import { buildWhatsAppUrl } from '../utils/documents.ts';
+import { CONTACT_CONFIG } from '../config/contact.ts';
+import { CompletedProjectsCarousel } from '../components/CompletedProjectsCarousel.tsx';
 
 export function PartnerPage() {
   useDocumentMeta({
@@ -76,7 +78,8 @@ export function MediaPage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-10">
+    <>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-10">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-[#D92B25]">Real Kotihal Plant &amp; Site Showcase</p>
@@ -219,7 +222,10 @@ export function MediaPage() {
           </div>
         </div>
       </section>
-    </div>
+      </div>
+
+      <CompletedProjectsCarousel projects={data?.projects || []} sectionId="gallery-completed-projects" />
+    </>
   );
 }
 
@@ -520,6 +526,46 @@ export function ContactPage() {
                     Instagram
                   </a>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* Sales Head & Corporate Office Card */}
+          <div className="warm-card overflow-hidden">
+            <div className="bg-[#0F1F5C] overflow-hidden border-b border-[#D7E4FF] dark:border-[#264096]">
+              <img
+                src={CONTACT_CONFIG.salesHead.visitingCardImage}
+                alt={`Official visiting card of ${CONTACT_CONFIG.salesHead.name}, ${CONTACT_CONFIG.salesHead.role} at MY CONCRETE`}
+                width={1200}
+                height={675}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+            <div className="p-5 space-y-2.5 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-[#D92B25]">
+                    {CONTACT_CONFIG.salesHead.role}
+                  </p>
+                  <h2 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
+                    {CONTACT_CONFIG.salesHead.name}
+                  </h2>
+                </div>
+                <CallLink
+                  phone={CONTACT_CONFIG.phoneDisplay}
+                  whatsapp={CONTACT_CONFIG.whatsappDisplay}
+                  className="rounded-full bg-[#1F3FA8] hover:bg-[#D92B25] text-white px-3.5 py-1.5 text-xs font-semibold transition-colors"
+                >
+                  Call {CONTACT_CONFIG.phoneDisplay}
+                </CallLink>
+              </div>
+              <div className="pt-2 border-t border-[#D7E4FF] dark:border-[#264096] space-y-1 text-xs">
+                <p className="font-semibold text-[#0F1F5C] dark:text-white">Corporate Office</p>
+                <p className="text-[var(--muted)] leading-relaxed">
+                  {CONTACT_CONFIG.corporateOfficeAddress}
+                </p>
               </div>
             </div>
           </div>

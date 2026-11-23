@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import type { BookingRecord, BusinessConfig } from '../types/index.ts';
+import type { BookingRecord, BusinessConfig, ProductItem } from '../types/index.ts';
 
 export function cleanPhoneDigits(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -18,6 +18,103 @@ export function buildWhatsAppUrl(phoneOrWhatsapp: string, message?: string): str
     return `https://wa.me/${target}`;
   }
   return `https://wa.me/${target}?text=${encodeURIComponent(message)}`;
+}
+
+export function getQuickQuoteWhatsAppContext(
+  pathname: string,
+  search: string,
+  products: ProductItem[] = []
+): { productName: string; pageContext: string; message: string } {
+  const params = new URLSearchParams(search);
+  const queryProduct = params.get('product') || '';
+  const queryGrade = params.get('grade') || '';
+  const queryVolume = params.get('volume') || params.get('qty') || '';
+  const queryBricks = params.get('bricks') || '';
+
+  const findProductByKey = (key: string): ProductItem | undefined => {
+    const normalized = key.trim().toLowerCase();
+    if (!normalized) return undefined;
+    return products.find(
+      (p) =>
+        p.slug.toLowerCase() === normalized ||
+        p.name.toLowerCase() === normalized ||
+        p.name.toLowerCase().includes(normalized)
+    );
+  };
+
+  let productName = 'Ready Mix Concrete & Cement Bricks';
+  let pageContext = 'Home Page';
+
+  if (pathname.startsWith('/products/')) {
+    const slug = decodeURIComponent(pathname.replace('/products/', '').split('/')[0] || '');
+    const matched = findProductByKey(slug);
+    productName = matched?.name || slug.replace(/-/g, ' ');
+    pageContext = `Product Page (${productName})`;
+  } else if (pathname === '/products') {
+    productName = 'Ready Mix Concrete & Cement Bricks';
+    pageContext = 'All Products Catalog';
+  } else if (pathname === '/book' || pathname === '/quote') {
+    const matched = findProductByKey(queryProduct);
+    productName = matched?.name || queryProduct || 'Ready Mix Concrete & Cement Bricks';
+    pageContext = pathname === '/book' ? 'Online 24/7 Booking Desk' : 'Custom Quote Page';
+  } else if (pathname.startsWith('/tools/calculator')) {
+    productName = 'Ready Mix Concrete (Volume Estimate)';
+    pageContext = 'Concrete Volume Calculator';
+  } else if (pathname.startsWith('/tools/brick-calculator')) {
+    productName = 'Cement Bricks & Solid Blocks';
+    pageContext = 'Cement Brick Calculator';
+  } else if (pathname.startsWith('/tools/grade-helper')) {
+    productName = 'Concrete Grade Selection (M5–M40+)';
+    pageContext = 'Structural Grade Helper';
+  } else if (pathname.startsWith('/tools/plant-locator')) {
+    productName = 'Ready Mix Concrete / Cement Bricks';
+    pageContext = 'Kotihal & Davangere Plant Locator';
+  } else if (pathname.startsWith('/customers/')) {
+    const seg = decodeURIComponent(pathname.replace('/customers/', '').split('/')[0] || '');
+    const segLabel = seg ? `${seg.charAt(0).toUpperCase()}${seg.slice(1)} Projects` : 'Customer Sector';
+    productName =
+      seg === 'infrastructure'
+        ? 'Infrastructure & Pavement Concrete'
+        : seg === 'industrial'
+          ? 'Industrial Flooring Concrete & Solid Blocks'
+          : 'Residential Slab Concrete & Cement Bricks';
+    pageContext = `${segLabel} Guide`;
+  } else if (pathname.startsWith('/blog/')) {
+    const slug = decodeURIComponent(pathname.replace('/blog/', '').split('/')[0] || '');
+    pageContext = `Technical Guide (${slug.replace(/-/g, ' ')})`;
+  } else if (pathname === '/gallery' || pathname === '/media') {
+    pageContext = 'Plant & Project Gallery';
+  } else if (pathname === '/contact') {
+    pageContext = 'Contact & Corporate Office Page';
+  } else if (pathname.startsWith('/about')) {
+    pageContext = 'About MY CONCRETE';
+  } else if (pathname === '/site-visit') {
+    pageContext = 'Site / Plant Visit Request';
+  } else if (pathname === '/track') {
+    pageContext = 'Track Booking Page';
+  } else if (pathname !== '/') {
+    pageContext = `Page ${pathname}`;
+  }
+
+  const extras: string[] = [];
+  if (queryGrade) extras.push(`Grade/Size: ${queryGrade}`);
+  if (queryVolume) extras.push(`Est. Volume: ${queryVolume} m³`);
+  if (queryBricks) extras.push(`Est. Qty: ${queryBricks} pieces`);
+
+  const detailsLine = extras.length > 0 ? ` (${extras.join(', ')})` : '';
+  const message = `Hi MY CONCRETE, I'd like a Quick Quote for *${productName}*${detailsLine}. [Context: ${pageContext} | ${pathname}${search}]`;
+
+  return { productName, pageContext, message };
+}
+
+export function buildWhatsAppQuickQuoteUrl(
+  phoneOrWhatsapp: string,
+  pathname: string,
+  search: string,
+  products: ProductItem[] = []
+): string {
+  const { message } = getQuickQuoteWhatsAppContext(pathname, search, products);
+  return buildWhatsAppUrl(phoneOrWhatsapp, message);
 }
 
 export function downloadBookingPdf(booking: BookingRecord, biz: BusinessConfig): void {

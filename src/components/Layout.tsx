@@ -14,7 +14,12 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
-import { buildWhatsAppUrl, cleanPhoneDigits, isPlaceholderValue } from '../utils/documents.ts';
+import {
+  buildWhatsAppQuickQuoteUrl,
+  buildWhatsAppUrl,
+  cleanPhoneDigits,
+  isPlaceholderValue,
+} from '../utils/documents.ts';
 import { ConnectForm } from './ConnectForm.tsx';
 import { BrandLogo } from './BrandLogo.tsx';
 import { CallLink, CopyPhoneButton, MailLink } from './ContactLinks.tsx';
@@ -107,6 +112,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const whatsappHref = buildWhatsAppUrl(
     whatsappDisplay,
     'Hi MY CONCRETE, I would like to enquire about ready-mix concrete.'
+  );
+  const quickQuoteWhatsAppHref = buildWhatsAppQuickQuoteUrl(
+    whatsappDisplay,
+    location.pathname,
+    location.search,
+    data?.products || []
   );
 
   const isAdminRoute = location.pathname.startsWith('/admin');
@@ -869,8 +880,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="space-y-3 text-sm text-slate-300">
-            <h4 className="font-display font-semibold text-[#FFC93C] text-sm">Plant Contact</h4>
+            <h4 className="font-display font-semibold text-[#FFC93C] text-sm">Plant &amp; Corporate Contact</h4>
             <p>{biz?.address}</p>
+            <p className="text-xs text-slate-300/90 leading-relaxed">
+              <strong className="text-white">Corporate Office:</strong>{' '}
+              {CONTACT_CONFIG.corporateOfficeAddress}
+            </p>
+            <p className="text-xs text-slate-300/90">
+              <strong className="text-white">{CONTACT_CONFIG.salesHead.role}:</strong>{' '}
+              {CONTACT_CONFIG.salesHead.name}
+            </p>
             <p>
               <a
                 href={biz?.googleMapsUrl || 'https://share.google/oZzcrYosJ0JYw2tTn'}
@@ -940,7 +959,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </footer>
 
-      {/* Desktop Floating Buttons */}
+      {/* Desktop Floating Buttons (Bottom-Right) */}
       <div className="hidden md:flex fixed right-5 bottom-6 z-30 flex-col items-end gap-2.5">
         <CallLink
           phone={phoneDisplay}
@@ -951,13 +970,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <span className="tabular-nums">Call {phoneDisplay}</span>
         </CallLink>
         <a
-          href={whatsappHref}
+          href={quickQuoteWhatsAppHref}
           target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 rounded-full bg-[#16A34A] text-white px-4 py-2 text-xs font-semibold shadow-lg hover:brightness-110 transition-all"
+          rel="noopener noreferrer"
+          aria-label="WhatsApp Quick Quote"
+          data-testid="whatsapp-quick-quote"
+          className="inline-flex items-center gap-2 rounded-full bg-[#16A34A] text-white px-4 py-2.5 text-xs font-bold shadow-lg hover:brightness-110 transition-all"
         >
-          <MessageCircle className="w-3.5 h-3.5" />
-          <span>WhatsApp</span>
+          <MessageCircle className="w-4 h-4 shrink-0" />
+          <span>WhatsApp Quick Quote</span>
         </a>
         <Link to="/book" className="group btn-orange-pill animate-gentle-pulse px-4 py-2.5 text-xs">
           <span>{t('bookDelivery')}</span>
@@ -972,6 +993,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </button>
       </div>
 
+      {/* Mobile Floating WhatsApp Quick Quote Pill (Above Sticky Bottom Bar) */}
+      <a
+        href={quickQuoteWhatsAppHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="WhatsApp Quick Quote"
+        data-testid="whatsapp-quick-quote-mobile"
+        className="md:hidden fixed right-3 bottom-14 z-30 inline-flex items-center gap-1.5 rounded-full bg-[#16A34A] text-white px-3.5 py-2 text-xs font-bold shadow-[0_10px_24px_-6px_rgba(22,163,74,0.55)] border border-white/25 hover:brightness-110 transition-all"
+      >
+        <MessageCircle className="w-4 h-4 shrink-0" />
+        <span>WhatsApp Quick Quote</span>
+      </a>
+
       {/* Mobile Sticky Bottom Bar */}
       <div className="md:hidden fixed inset-x-0 bottom-0 z-30 h-12 bg-[#0F1F5C] border-t border-white/15 grid grid-cols-3 text-xs font-semibold text-white">
         <CallLink
@@ -983,9 +1017,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <span>{t('callNow')}</span>
         </CallLink>
         <a
-          href={whatsappHref}
+          href={quickQuoteWhatsAppHref}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="flex items-center justify-center gap-1.5 border-r border-white/15 text-emerald-400"
         >
           <MessageCircle className="w-3.5 h-3.5" />
