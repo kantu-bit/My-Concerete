@@ -23,11 +23,14 @@ export function useDocumentMeta({ title, description, jsonLd }: SeoOptions) {
     setMeta('meta[name="description"]', 'name', 'description', description);
     setMeta('meta[property="og:title"]', 'property', 'og:title', title);
     setMeta('meta[property="og:description"]', 'property', 'og:description', description);
+    setMeta('meta[property="og:image"]', 'property', 'og:image', `${window.location.origin}/images/home/og-image.jpg`);
     setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
     setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', description);
+    setMeta('meta[name="twitter:image"]', 'name', 'twitter:image', `${window.location.origin}/images/home/og-image.jpg`);
 
     const existingCanon = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     const url = window.location.origin + window.location.pathname;
+    setMeta('meta[property="og:url"]', 'property', 'og:url', url);
     if (existingCanon) {
       existingCanon.href = url;
     } else {

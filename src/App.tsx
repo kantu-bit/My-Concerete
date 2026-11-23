@@ -54,6 +54,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/about/story" element={<AboutStoryPage />} />
+            <Route path="/about/our-story" element={<AboutStoryPage />} />
             <Route path="/about/why-my-concrete" element={<WhyMyConcretePage />} />
             <Route path="/about/plant-location" element={<PlantLocationPage />} />
             <Route path="/about/careers" element={<CareersPage />} />
@@ -66,6 +67,7 @@ export default function App() {
 
             <Route path="/partner" element={<PartnerPage />} />
             <Route path="/media" element={<MediaPage />} />
+            <Route path="/gallery" element={<MediaPage />} />
             <Route path="/blog" element={<BlogListPage />} />
             <Route path="/blog/:slug" element={<BlogDetailPage />} />
             <Route path="/contact" element={<ContactPage />} />

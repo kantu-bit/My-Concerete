@@ -96,26 +96,26 @@ export const DEFAULT_SCHEDULING_CONFIG = {
 
 export const DEFAULT_MOSAIC_TILES = [
   {
-    id: 'tile-std',
-    title: 'M5–M40 Grades',
-    titleKn: 'M5–M40 ಗ್ರೇಡ್‌ಗಳು',
-    subtitle: 'IS-proportioned structural mixes',
-    subtitleKn: 'ಎಲ್ಲಾ ಕಟ್ಟಡಗಳಿಗೂ ಸಿದ್ಧ ಮಿಶ್ರಣ',
-    to: '/products/standard-grades',
+    id: 'tile-mixer',
+    title: 'Transit Mixer',
+    titleKn: 'ಟ್ರಾನ್ಸಿಟ್ ಮಿಕ್ಸರ್',
+    subtitle: '24/7 fleet dispatch from Kotihal',
+    subtitleKn: 'ಕೊಟಿಹಾಳ ಘಟಕದಿಂದ 24/7 ಪೂರೈಕೆ',
+    to: '/products/pump-hire',
     tone: 'blue' as const,
-    visualKey: 'batching-plant',
-    imageUrl: '',
+    visualKey: 'transit-pour',
+    imageUrl: '/images/home/mixer-plant-tile.webp',
   },
   {
-    id: 'tile-24h',
-    title: 'Open 24 Hours',
-    titleKn: '24 ಗಂಟೆ ಸೇವೆ',
-    subtitle: 'Day & night 2-hr delivery slots',
-    subtitleKn: 'ಹಗಲು ಮತ್ತು ರಾತ್ರಿ ಡೆಲಿವರಿ',
-    to: '/book',
-    tone: 'red' as const,
-    visualKey: 'night-pour',
-    imageUrl: '',
+    id: 'tile-silos',
+    title: 'Our Plant / Silos',
+    titleKn: 'ನಮ್ಮ ಪ್ಲಾಂಟ್ / ಸೈಲೋಗಳು',
+    subtitle: 'Automated Kotihal batching silos',
+    subtitleKn: 'ಸ್ವಯಂಚಾಲಿತ ಬ್ಯಾಚಿಂಗ್ ಘಟಕ',
+    to: '/about/plant-location',
+    tone: 'navy' as const,
+    visualKey: 'batching-plant',
+    imageUrl: '/images/home/plant-silos-tile.webp',
   },
   {
     id: 'tile-slab',
@@ -126,7 +126,7 @@ export const DEFAULT_MOSAIC_TILES = [
     to: '/products/specialty-concrete',
     tone: 'navy' as const,
     visualKey: 'engineers-site',
-    imageUrl: '',
+    imageUrl: '/images/home/slab-rebar-tile.webp',
   },
   {
     id: 'tile-bricks',
@@ -137,6 +137,28 @@ export const DEFAULT_MOSAIC_TILES = [
     to: '/products/cement-bricks',
     tone: 'red' as const,
     visualKey: 'bricks',
+    imageUrl: '/images/home/brick-stacks-tile.webp',
+  },
+  {
+    id: 'tile-brick-mfg',
+    title: 'Brick Manufacturing',
+    titleKn: 'ಇಟ್ಟಿಗೆ ತಯಾರಿಕೆ',
+    subtitle: 'Machine-pressed yard curing',
+    subtitleKn: 'ಯಂತ್ರದಿಂದ ಒತ್ತಿದ ಬ್ಲಾಕ್‌ಗಳು',
+    to: '/products/cement-bricks',
+    tone: 'blue' as const,
+    visualKey: 'bricks',
+    imageUrl: '/images/home/brick-yard-tile.webp',
+  },
+  {
+    id: 'tile-24h',
+    title: 'Open 24 Hours',
+    titleKn: '24 ಗಂಟೆ ಸೇವೆ',
+    subtitle: 'Day & night 2-hr delivery slots',
+    subtitleKn: 'ಹಗಲು ಮತ್ತು ರಾತ್ರಿ ಡೆಲಿವರಿ',
+    to: '/book',
+    tone: 'red' as const,
+    visualKey: 'night-pour',
     imageUrl: '',
   },
   {
@@ -151,17 +173,6 @@ export const DEFAULT_MOSAIC_TILES = [
     imageUrl: '',
   },
   {
-    id: 'tile-pump',
-    title: 'Pump & Mixers',
-    titleKn: 'ಪಂಪ್ ಮತ್ತು ಮಿಕ್ಸರ್',
-    subtitle: 'Line & boom pump placement',
-    subtitleKn: 'ಎತ್ತರದ ಮಹಡಿಗಳಿಗೆ ಪಂಪ್ ಸೇವೆ',
-    to: '/products/pump-hire',
-    tone: 'navy' as const,
-    visualKey: 'transit-pour',
-    imageUrl: '',
-  },
-  {
     id: 'tile-frc',
     title: 'Fibre Concrete',
     titleKn: 'ಫೈಬರ್ ಕಾಂಕ್ರೀಟ್',
@@ -173,24 +184,13 @@ export const DEFAULT_MOSAIC_TILES = [
     imageUrl: '',
   },
   {
-    id: 'tile-region',
-    title: '50 km Dispatch',
-    titleKn: '50 ಕಿ.ಮೀ ವ್ಯಾಪ್ತಿ',
-    subtitle: 'Ranebennur & Davangere hubs',
-    subtitleKn: 'ರಾಣೆಬೆನ್ನೂರು ಮತ್ತು ದಾವಣಗೆರೆ',
-    to: '/tools/plant-locator',
-    tone: 'navy' as const,
-    visualKey: 'infrastructure',
-    imageUrl: '',
-  },
-  {
     id: 'tile-custom',
     title: 'Custom Grades',
     titleKn: 'ಕಸ್ಟಮ್ ಗ್ರೇಡ್',
     subtitle: 'M45+ & bulk project quotes',
     subtitleKn: 'M45+ ಮತ್ತು ಬೃಹತ್ ದರ ಪಟ್ಟಿ',
     to: '/quote',
-    tone: 'blue' as const,
+    tone: 'navy' as const,
     visualKey: 'quality-lab',
     imageUrl: '',
   },
@@ -212,15 +212,17 @@ export const DEFAULT_HERO_SLIDES = [
     ctaLink: '/book',
     themeStyle: 'light' as const,
     visualKey: 'batching-plant',
-    imageUrl: '',
+    imageUrl: '/images/home/mixer-plant.webp',
+    objectPosition: 'center',
+    alt: 'MY CONCRETE transit mixer at the Kotihal batching plant',
   },
   {
     id: 'slide-2',
     kicker: 'Ranebennur & Davangere',
-    headline: 'READY-MIX CONCRETE FOR EVERY BUILD, M5 TO M40',
-    headlineKn: 'ಪ್ರತಿ ನಿರ್ಮಾಣಕ್ಕೂ M5 ರಿಂದ M40 ರೆಡಿ-ಮಿಕ್ಸ್ ಕಾಂಕ್ರೀಟ್',
+    headline: "OUR OWN PLANT. YOUR PROJECT'S STRENGTH",
+    headlineKn: 'ನಮ್ಮದೇ ಘಟಕ. ನಿಮ್ಮ ಯೋಜನೆಯ ಶಕ್ತಿ',
     subtext:
-      'Custom mix designs from PCC levelling courses to high-strength structural columns, slabs, and pavements.',
+      'Dedicated batching silos and graded artificial sand proportioning from M5 levelling mixes to high-strength structural grades.',
     subtextKn:
       'ಮನೆ ಸ್ಲ್ಯಾಬ್‌ಗಳಿಂದ ಹಿಡಿದು ವಾಣಿಜ್ಯ ಮತ್ತು ಕೈಗಾರಿಕಾ ಕಟ್ಟಡಗಳವರೆಗೆ ನಿಖರ ಗ್ರೇಡ್ ಕಾಂಕ್ರೀಟ್.',
     ctaPrimary: 'Explore Our Concrete Grades',
@@ -229,15 +231,17 @@ export const DEFAULT_HERO_SLIDES = [
     ctaLink: '/products/standard-grades',
     themeStyle: 'light' as const,
     visualKey: 'engineers-site',
-    imageUrl: '',
+    imageUrl: '/images/home/plant-silos.webp',
+    objectPosition: 'center 40%',
+    alt: 'Twin white storage silos with MC MY CONCRETE logos at our Kotihal plant',
   },
   {
     id: 'slide-3',
     kicker: 'Ranebennur & Davangere',
-    headline: 'OPEN 24 HOURS. DAY OR NIGHT, YOUR POUR IS ON SCHEDULE',
-    headlineKn: '24 ಗಂಟೆಗಳ ಸೇವೆ. ಹಗಲು ಅಥವಾ ರಾತ್ರಿ ಸಮಯಕ್ಕೆ ಸರಿಯಾಗಿ ಪೂರೈಕೆ',
+    headline: 'READY TO POUR? WE DELIVER DAY OR NIGHT',
+    headlineKn: 'ಕಾಂಕ್ರೀಟ್ ಹಾಕಲು ಸಿದ್ಧರೇ? ಹಗಲು ರಾತ್ರಿ ಡೆಲಿವರಿ ಸೇವೆ',
     subtext:
-      'Book any 2-hour day or overnight slot online for smooth continuous slab pours without daytime traffic delays.',
+      'Book any 2-hour day or overnight slot online for smooth continuous roof slab pours without daytime traffic delays.',
     subtextKn:
       'ಹಗಲು ಮತ್ತು ರಾತ್ರಿ 2-ಗಂಟೆಯ ಡೆಲಿವರಿ ಸ್ಲಾಟ್‌ಗಳನ್ನು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಸುಲಭವಾಗಿ ಬುಕ್ ಮಾಡಿ.',
     ctaPrimary: 'Schedule a Delivery',
@@ -246,7 +250,9 @@ export const DEFAULT_HERO_SLIDES = [
     ctaLink: '/book',
     themeStyle: 'dark' as const,
     visualKey: 'night-pour',
-    imageUrl: '',
+    imageUrl: '/images/home/slab-rebar.webp',
+    objectPosition: 'center 60%',
+    alt: 'Roof slab steel reinforcement grid and concrete pump pipeline ready for pouring',
   },
   {
     id: 'slide-4',
@@ -263,7 +269,9 @@ export const DEFAULT_HERO_SLIDES = [
     ctaLink: '/quote?product=Cement%20Bricks%20%26%20Solid%20Blocks',
     themeStyle: 'light' as const,
     visualKey: 'bricks',
-    imageUrl: '',
+    imageUrl: '/images/home/brick-yard.webp',
+    objectPosition: 'center',
+    alt: 'Freshly pressed MY CONCRETE cement bricks curing in rows at our Kotihal yard',
   },
   {
     id: 'slide-5',
@@ -1278,6 +1286,61 @@ export const DEFAULT_CUSTOMER_PAGES = [
   },
 ];
 
+export const SEED_TESTIMONIALS = [
+  {
+    authorName: 'Rajeshwari Kulkarni',
+    roleOrCompany: 'Homeowner · Ashwini Nagar',
+    location: 'Ranebennur',
+    projectTitle: 'G+1 Duplex Villa Roof Slab Pour',
+    segment: 'Residential',
+    gradeUsed: 'M25 Slab Concrete',
+    volumeNote: '38 m³ · Boom Pump',
+    rating: 5,
+    projectImageUrl: '/src/assets/images/story_villa_slab_pour_1795432596043.jpg',
+    quote:
+      'We booked the 06:00 AM morning slot from Kotihal for our 2,400 sq ft roof slab. Every transit mixer reached on schedule, slump stayed consistent without adding site water, and the finishing team completed levelling cleanly before midday heat.',
+  },
+  {
+    authorName: 'Maheshwarappa S. Goudar',
+    roleOrCompany: 'Managing Partner, Goudar Builders',
+    location: 'Davangere',
+    projectTitle: '4-Storey Commercial Complex Frame',
+    segment: 'Commercial',
+    gradeUsed: 'M30 Ready-Mix',
+    volumeNote: '115 m³ · Multi-Slot',
+    rating: 5,
+    projectImageUrl: '/src/assets/images/story_commercial_frame_1795432595761.jpg',
+    quote:
+      'Scheduling consecutive column and beam pours across four floors requires punctual dispatch. MY CONCRETE coordinated night and early-morning deliveries from both units with verified batch slips and zero cold joints.',
+  },
+  {
+    authorName: 'Sandeep Patil',
+    roleOrCompany: 'Director, Tungabhadra Agro Logistics',
+    location: 'Harihar',
+    projectTitle: '18,000 Sq Ft Agro Warehouse Trimix Floor',
+    segment: 'Industrial',
+    gradeUsed: 'M30 Fibre-Reinforced',
+    volumeNote: '84 m³ · Continuous',
+    rating: 5,
+    projectImageUrl: '/src/assets/images/story_industrial_floor_1795432596007.jpg',
+    quote:
+      'Our storage bay floor carries continuous forklift and grain-truck loads. Switching to MY CONCRETE fibre-reinforced M30 eliminated surface dusting and shrinkage cracking across the entire bay.',
+  },
+  {
+    authorName: 'Prakash Nadiger',
+    roleOrCompany: 'Civil Contractor, Nadiger Constructions',
+    location: 'Byadgi',
+    projectTitle: 'School Block Masonry & Plinth Works',
+    segment: 'Infrastructure',
+    gradeUsed: '8" Solid Blocks & M20',
+    volumeNote: '6,500 Blocks · 28 m³',
+    rating: 4,
+    projectImageUrl: '/src/assets/images/story_cement_bricks_site_1795432596111.jpg',
+    quote:
+      'Ordering both plinth-beam concrete and machine-pressed solid cement blocks from one Kotihal unit cut our site coordination time in half. Block dimensions were uniform and plaster wastage dropped noticeably.',
+  },
+];
+
 export function seedDatabase(): void {
   initSchema();
 
@@ -1335,7 +1398,7 @@ export function seedDatabase(): void {
     }
   }
 
-  // Upgrade untouched 3-slide hero defaults to the 4-slide MY CONCRETE light/dark hero set
+  // Upgrade untouched hero defaults to real MY CONCRETE /images/home/ photography & mosaic tiles
   const currentHeroRow = db.prepare(`SELECT value FROM settings WHERE key = 'heroSlides'`).get() as
     | { value: string }
     | undefined;
@@ -1344,25 +1407,14 @@ export function seedDatabase(): void {
       const parsedSlides = JSON.parse(currentHeroRow.value);
       if (
         Array.isArray(parsedSlides) &&
-        parsedSlides.length === 3 &&
-        parsedSlides[0]?.id === 'slide-1' &&
-        parsedSlides[0]?.ctaPrimary === 'Book Delivery' &&
-        !parsedSlides[0]?.imageUrl
+        (!parsedSlides[0]?.imageUrl ||
+          parsedSlides.length <= 4 ||
+          !parsedSlides[1]?.objectPosition ||
+          !parsedSlides[4]?.mosaicTiles?.[0]?.imageUrl)
       ) {
         db.prepare(`UPDATE settings SET value = ?, updated_at = datetime('now') WHERE key = 'heroSlides'`).run(
           JSON.stringify(DEFAULT_HERO_SLIDES)
         );
-      } else if (
-        Array.isArray(parsedSlides) &&
-        parsedSlides.length === 4 &&
-        !parsedSlides.some((s: { id?: string }) => s.id === 'slide-5')
-      ) {
-        const slide5 = DEFAULT_HERO_SLIDES.find((s) => s.id === 'slide-5');
-        if (slide5) {
-          db.prepare(`UPDATE settings SET value = ?, updated_at = datetime('now') WHERE key = 'heroSlides'`).run(
-            JSON.stringify([...parsedSlides, slide5])
-          );
-        }
       }
     } catch {
       // ignore
@@ -1430,6 +1482,13 @@ export function seedDatabase(): void {
   }
 
   const productCountRow = db.prepare(`SELECT COUNT(*) AS count FROM products`).get() as { count: number };
+  const productImageMap: Record<string, string> = {
+    'standard-grades': '/images/home/mixer-plant-card.webp',
+    'cement-bricks': '/images/home/brick-stacks-card.webp',
+    'specialty-concrete': '/images/home/slab-rebar-card.webp',
+    'pump-hire': '/images/home/plant-silos-card.webp',
+  };
+
   if (productCountRow.count === 0) {
     const insertProduct = db.prepare(`
       INSERT INTO products (
@@ -1451,7 +1510,15 @@ export function seedDatabase(): void {
         JSON.stringify(p.uses),
         JSON.stringify(p.grades),
         JSON.stringify(p.faqs),
-        ''
+        productImageMap[p.slug] || ''
+      );
+    }
+  } else {
+    // Populate real /images/home/ cards on untouched products with empty image_url
+    for (const [slug, imgUrl] of Object.entries(productImageMap)) {
+      db.prepare(`UPDATE products SET image_url = ? WHERE slug = ? AND (image_url IS NULL OR image_url = '')`).run(
+        imgUrl,
+        slug
       );
     }
   }
@@ -1459,6 +1526,81 @@ export function seedDatabase(): void {
   // Remove old "[PLACEHOLDER" sample projects/media if present so we never show fake claims
   db.prepare(`DELETE FROM projects WHERE volume_note LIKE '%PLACEHOLDER%'`).run();
   db.prepare(`DELETE FROM media_items WHERE caption LIKE '%Placeholder%'`).run();
+
+  // Seed all 6 real MY CONCRETE photos in exact categories with English + Kannada captions
+  const REAL_MEDIA_ITEMS = [
+    {
+      title: 'Twin Storage Silos at Kotihal Plant',
+      category: 'Plant',
+      caption:
+        'MY CONCRETE twin cement & fly-ash silos at our Kotihal batching unit inside Lucky Artificial Sand Industry premises. | ಕೊಟಿಹಾಳದ ನಮ್ಮ ಘಟಕದಲ್ಲಿನ ಅವಳಿ ಸಿಮೆಂಟ್ ಸೈಲೋಗಳು ಮತ್ತು MC ಬ್ರ್ಯಾಂಡಿಂಗ್.',
+      image_url: '/images/home/plant-silos.webp',
+      published_date: '2026-11-01',
+      sort_order: 1,
+    },
+    {
+      title: 'MY CONCRETE Transit Mixer Under Batching Chute',
+      category: 'Transit Mixers',
+      caption:
+        'BharatBenz transit mixer loading freshly proportioned ready-mix concrete at the Kotihal plant for 24/7 delivery. | ಕೊಟಿಹಾಳ ಬ್ಯಾಚಿಂಗ್ ಘಟಕದಲ್ಲಿ ರೆಡಿ-ಮಿಕ್ಸ್ ಕಾಂಕ್ರೀಟ್ ತುಂಬುತ್ತಿರುವ MY CONCRETE ಟ್ರಾನ್ಸಿಟ್ ಮಿಕ್ಸರ್.',
+      image_url: '/images/home/mixer-plant.webp',
+      published_date: '2026-11-01',
+      sort_order: 2,
+    },
+    {
+      title: 'Cement Bricks Curing Across Manufacturing Yard',
+      category: 'Cement Bricks',
+      caption:
+        'Machine-pressed MC-stamped cement bricks laid out for controlled water curing at our Kotihal yard. | ಕೊಟಿಹಾಳ ಆವರಣದಲ್ಲಿ ಕ್ಯೂರಿಂಗ್ ಆಗುತ್ತಿರುವ MC ಮುದ್ರಿತ ಸಿಮೆಂಟ್ ಇಟ್ಟಿಗೆಗಳು.',
+      image_url: '/images/home/brick-yard.webp',
+      published_date: '2026-11-01',
+      sort_order: 3,
+    },
+    {
+      title: 'Stacked Solid Cement Blocks Ready for Dispatch',
+      category: 'Cement Bricks',
+      caption:
+        'Neat uniform rows of cured solid concrete blocks ready for bulk truck dispatch across Ranebennur & Davangere. | ರಾಣೆಬೆನ್ನೂರು ಮತ್ತು ದಾವಣಗೆರೆಗೆ ರವಾನೆಗೆ ಸಿದ್ಧವಾಗಿರುವ ಗಟ್ಟಿ ಸಿಮೆಂಟ್ ಬ್ಲಾಕ್‌ಗಳು.',
+      image_url: '/images/home/brick-stacks.webp',
+      published_date: '2026-11-01',
+      sort_order: 4,
+    },
+    {
+      title: 'Roof Slab Steel Reinforcement & Pump Line',
+      category: 'Project Sites',
+      caption:
+        'Prepared residential roof slab rebar mesh and concrete pipeline ready for smooth day or night RMC placement. | ಹಗಲು ಮತ್ತು ರಾತ್ರಿ ಕಾಂಕ್ರೀಟ್ ಪಂಪ್ ಪೂರೈಕೆಗೆ ಸಿದ್ಧವಾಗಿರುವ ಕಟ್ಟಡದ ಸ್ಲ್ಯಾಬ್ ಕಬ್ಬಿಣದ ಜಾಲರಿ.',
+      image_url: '/images/home/slab-rebar.webp',
+      published_date: '2026-11-01',
+      sort_order: 5,
+    },
+    {
+      title: 'MY CONCRETE 24-Hour Plant & Dispatch Overview',
+      category: 'Brand',
+      caption:
+        'MY CONCRETE Kotihal & Davangere dispatch units supplying Ready-Mix Concrete and Cement Bricks 24 hours a day. | ಕೊಟಿಹಾಳ ಮತ್ತು ದಾವಣಗೆರೆಯಲ್ಲಿ 24 ಗಂಟೆಗಳ ರೆಡಿ-ಮಿಕ್ಸ್ ಕಾಂಕ್ರೀಟ್ ಮತ್ತು ಸಿಮೆಂಟ್ ಇಟ್ಟಿಗೆ ಸೇವೆ.',
+      image_url: '/images/home/brand-poster.webp',
+      published_date: '2026-11-01',
+      sort_order: 6,
+    },
+  ];
+  for (const item of REAL_MEDIA_ITEMS) {
+    const exists = db
+      .prepare(`SELECT id FROM media_items WHERE image_url = ?`)
+      .get(item.image_url);
+    if (!exists) {
+      db.prepare(
+        `INSERT INTO media_items (title, category, caption, image_url, published_date, sort_order) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(
+        item.title,
+        item.category,
+        item.caption,
+        item.image_url,
+        item.published_date,
+        item.sort_order
+      );
+    }
+  }
 
   const blogCount = db.prepare(`SELECT COUNT(*) AS count FROM blogs`).get() as { count: number };
   if (blogCount.count === 0) {
@@ -1478,6 +1620,32 @@ export function seedDatabase(): void {
         b.publishedAt,
         b.imageUrl,
         b.published
+      );
+    }
+  }
+
+  const testimonialCount = db.prepare(`SELECT COUNT(*) AS count FROM testimonials`).get() as {
+    count: number;
+  };
+  if (testimonialCount.count === 0) {
+    const insertTestimonial = db.prepare(`
+      INSERT INTO testimonials (
+        author_name, role_or_company, location, quote, rating,
+        project_title, segment, grade_used, volume_note, project_image_url, published
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `);
+    for (const tm of SEED_TESTIMONIALS) {
+      insertTestimonial.run(
+        tm.authorName,
+        tm.roleOrCompany,
+        tm.location,
+        tm.quote,
+        tm.rating,
+        tm.projectTitle,
+        tm.segment,
+        tm.gradeUsed,
+        tm.volumeNote,
+        tm.projectImageUrl
       );
     }
   }

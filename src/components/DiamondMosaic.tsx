@@ -121,6 +121,9 @@ export function DiamondMosaic({ tiles, lang }: DiamondMosaicProps) {
                         | 'industrial') || 'product-mix'
                     }
                     tone={tile.tone === 'navy' ? 'dark' : 'light'}
+                    width={720}
+                    height={720}
+                    objectPosition={tile.objectPosition}
                     title={titleText}
                     className="w-full h-full transition-transform duration-500 group-hover:scale-105"
                   />

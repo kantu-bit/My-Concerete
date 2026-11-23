@@ -14,7 +14,8 @@ import {
 import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { readApiJson } from '../utils/api.ts';
-import { CallLink } from '../components/ContactLinks.tsx';
+import { CallLink, MailLink } from '../components/ContactLinks.tsx';
+import { CONTACT_CONFIG } from '../config/contact.ts';
 import { buildWhatsAppUrl } from '../utils/documents.ts';
 
 interface SubmittedQuoteSummary {
@@ -142,8 +143,8 @@ export function GetQuotePage() {
     }
   }
 
-  const ownerEmail = biz?.email || 'myconcretektl@gmail.com';
-  const ownerWhatsapp = biz?.whatsapp || biz?.phone || '+91 73378 07372';
+  const ownerEmail = biz?.email || CONTACT_CONFIG.email;
+  const ownerWhatsapp = biz?.whatsapp || biz?.phone || CONTACT_CONFIG.whatsappDisplay;
 
   const quoteSummaryText = submittedQuote
     ? [
@@ -167,11 +168,9 @@ export function GetQuotePage() {
     ? submittedQuote.whatsappUrl || buildWhatsAppUrl(ownerWhatsapp, quoteSummaryText)
     : '#';
 
-  const quoteMailtoHref = submittedQuote
-    ? `mailto:${ownerEmail}?subject=${encodeURIComponent(
-        `MY CONCRETE Quote Request ${submittedQuote.quoteCode} – ${submittedQuote.customerName}`
-      )}&body=${encodeURIComponent(quoteSummaryText)}`
-    : '#';
+  const quoteEmailSubject = submittedQuote
+    ? `MY CONCRETE Quote Request ${submittedQuote.quoteCode} – ${submittedQuote.customerName}`
+    : CONTACT_CONFIG.defaultEmailSubject;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-8">
@@ -236,15 +235,15 @@ export function GetQuotePage() {
               <span>Send on WhatsApp</span>
             </a>
 
-            <a
-              href={quoteMailtoHref}
-              target="_top"
-              rel="noopener"
-              className="inline-flex items-center gap-2 rounded-full bg-[#D92B25] hover:brightness-110 text-white px-4 min-h-[44px] py-2 text-xs font-semibold transition-all"
+            <MailLink
+              email={ownerEmail}
+              subject={quoteEmailSubject}
+              body={quoteSummaryText}
+              className="justify-center gap-2 rounded-full bg-[#D92B25] hover:brightness-110 text-white px-4 py-2 text-xs font-semibold transition-all"
             >
               <Mail className="w-4 h-4" />
               <span>Send Quote via Email</span>
-            </a>
+            </MailLink>
 
             <CallLink
               phone={biz?.phone || '+91 73378 07372'}
@@ -486,8 +485,8 @@ export function SiteVisitPage() {
     }
   }
 
-  const ownerEmail = biz?.email || 'myconcretektl@gmail.com';
-  const ownerWhatsapp = biz?.whatsapp || biz?.phone || '+91 73378 07372';
+  const ownerEmail = biz?.email || CONTACT_CONFIG.email;
+  const ownerWhatsapp = biz?.whatsapp || biz?.phone || CONTACT_CONFIG.whatsappDisplay;
 
   const visitSummaryText = submittedVisit
     ? [
@@ -507,11 +506,9 @@ export function SiteVisitPage() {
     ? submittedVisit.whatsappUrl || buildWhatsAppUrl(ownerWhatsapp, visitSummaryText)
     : '#';
 
-  const visitMailtoHref = submittedVisit
-    ? `mailto:${ownerEmail}?subject=${encodeURIComponent(
-        `MY CONCRETE Visit Request ${submittedVisit.visitCode} – ${submittedVisit.customerName}`
-      )}&body=${encodeURIComponent(visitSummaryText)}`
-    : '#';
+  const visitEmailSubject = submittedVisit
+    ? `MY CONCRETE Visit Request ${submittedVisit.visitCode} – ${submittedVisit.customerName}`
+    : CONTACT_CONFIG.defaultEmailSubject;
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-8">
@@ -563,15 +560,15 @@ export function SiteVisitPage() {
               <span>Send on WhatsApp</span>
             </a>
 
-            <a
-              href={visitMailtoHref}
-              target="_top"
-              rel="noopener"
-              className="inline-flex items-center gap-2 rounded-full bg-[#D92B25] hover:brightness-110 text-white px-4 min-h-[44px] py-2 text-xs font-semibold transition-all"
+            <MailLink
+              email={ownerEmail}
+              subject={visitEmailSubject}
+              body={visitSummaryText}
+              className="justify-center gap-2 rounded-full bg-[#D92B25] hover:brightness-110 text-white px-4 py-2 text-xs font-semibold transition-all"
             >
               <Mail className="w-4 h-4" />
               <span>Send via Email</span>
-            </a>
+            </MailLink>
 
             <CallLink
               phone={biz?.phone || '+91 73378 07372'}

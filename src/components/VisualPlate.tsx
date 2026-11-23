@@ -54,6 +54,7 @@ interface VisualPlateProps {
   tone?: 'dark' | 'light';
   priority?: boolean;
   kenBurns?: boolean;
+  objectPosition?: string;
 }
 
 export function VisualPlate({
@@ -68,6 +69,7 @@ export function VisualPlate({
   tone = 'dark',
   priority = false,
   kenBurns = false,
+  objectPosition,
 }: VisualPlateProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -87,6 +89,7 @@ export function VisualPlate({
         fetchPriority={priority ? 'high' : 'auto'}
         referrerPolicy="no-referrer"
         onError={() => setImgFailed(true)}
+        style={objectPosition ? { objectPosition } : undefined}
         className={`object-cover ${kenBurns ? 'animate-ken-burns' : ''} ${className}`}
       />
     );

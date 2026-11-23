@@ -15,7 +15,6 @@ import {
   Layers,
   MapPin,
   Navigation,
-  Quote,
   ShieldCheck,
   Truck,
 } from 'lucide-react';
@@ -24,10 +23,12 @@ import { useDocumentMeta } from '../utils/seo.ts';
 import { FRIENDLY_API_ERROR, parseJsonResponse } from '../utils/api.ts';
 import { VisualPlate } from '../components/VisualPlate.tsx';
 import { CallLink } from '../components/ContactLinks.tsx';
+import { CustomerSuccessStories } from '../components/CustomerSuccessStories.tsx';
+import { DeliveryStatusWidget } from '../components/DeliveryStatusWidget.tsx';
 import { DiamondMosaic } from '../components/DiamondMosaic.tsx';
 import { ConnectForm } from '../components/ConnectForm.tsx';
 import { WaveDivider } from '../components/WaveDivider.tsx';
-import { PlantMap } from '../components/PlantMap.tsx';
+import { ServiceZoneExplorer } from '../components/ServiceZoneExplorer.tsx';
 
 function splitHeadlineLines(text: string, maxCharsPerLine = 22): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean);
@@ -170,9 +171,9 @@ export function HomePage() {
   ].filter(Boolean);
 
   useDocumentMeta({
-    title: 'MY CONCRETE – Readymix Concrete Unit | Ranebennur & Davangere',
+    title: 'MY CONCRETE – Ready Mix Concrete & Cement Bricks, Ranebennur & Davangere',
     description:
-      'All Ready Mix Concrete (M5–M40+) & Cement Bricks in Ranebennur and Davangere, Karnataka. Open 24 hours at Kotihal & Davangere. Calculate volume or bricks and book delivery online.',
+      'Ready-mix concrete (M5–M40+) and machine-pressed cement bricks from our Kotihal plant serving Ranebennur & Davangere, Karnataka. Open 24 hours — book your 2-hour delivery slot online.',
     jsonLd: [
       ...plantLocations.map((loc) => ({
         '@context': 'https://schema.org',
@@ -444,41 +445,56 @@ export function HomePage() {
               </>
             ) : (
               <>
-                {/* Right ~60% Visual Photo / Vector Illustration */}
-                <div className="absolute inset-y-0 right-0 w-full lg:w-[62%]">
-                  <VisualPlate
-                    imageUrl={activeSlide?.imageUrl}
-                    variant={
-                      (activeSlide?.visualKey as
-                        | 'batching-plant'
-                        | 'engineers-site'
-                        | 'night-pour'
-                        | 'bricks') || 'batching-plant'
-                    }
-                    tone={isDarkSlide ? 'dark' : 'light'}
-                    priority={slideIdx === 0}
-                    kenBurns={!prefersReducedMotion}
-                    title={biz?.businessName || 'MY CONCRETE – Readymix Concrete Unit'}
-                  />
-                </div>
+                {/* Right ~62% Visual Real MY CONCRETE Photography */}
+                {(() => {
+                  const heroImage =
+                    activeSlide?.imageUrl || '/images/home/mixer-plant.webp';
+                  const isPortraitHero =
+                    heroImage.includes('plant-silos') || heroImage.includes('slab-rebar');
+                  return (
+                    <div className="absolute inset-y-0 right-0 w-full lg:w-[64%] overflow-hidden">
+                      <VisualPlate
+                        imageUrl={heroImage}
+                        variant={
+                          (activeSlide?.visualKey as
+                            | 'batching-plant'
+                            | 'engineers-site'
+                            | 'night-pour'
+                            | 'bricks') || 'batching-plant'
+                        }
+                        tone={isDarkSlide ? 'dark' : 'light'}
+                        width={isPortraitHero ? 900 : 1280}
+                        height={isPortraitHero ? 1600 : 720}
+                        objectPosition={activeSlide?.objectPosition || 'center'}
+                        alt={
+                          activeSlide?.alt ||
+                          `${slideHeadline} – MY CONCRETE Kotihal Ranebennur & Davangere`
+                        }
+                        priority={slideIdx === 0}
+                        kenBurns={!prefersReducedMotion}
+                        title={biz?.businessName || 'MY CONCRETE – Readymix Concrete Unit'}
+                      />
+                    </div>
+                  );
+                })()}
 
-                {/* Gradient Overlay ensuring seamless left-edge fade & WCAG AA headline contrast */}
+                {/* Gentle gradient scrim ONLY where headline text sits so real photos stay sharp & vivid */}
                 <div
-                  className="absolute inset-0"
+                  className="hidden lg:block absolute inset-0"
                   style={{
                     background: isDarkSlide
-                      ? 'linear-gradient(90deg, #0F1F5C 0%, #0F1F5C 36%, rgba(15,31,92,0.90) 52%, rgba(15,31,92,0.52) 76%, rgba(15,31,92,0.28) 100%)'
-                      : 'linear-gradient(90deg, #FFFFFF 0%, #F4F8FF 34%, rgba(244,248,255,0.92) 48%, rgba(232,240,255,0.48) 68%, rgba(220,233,255,0.08) 100%)',
+                      ? 'linear-gradient(90deg, #0F1F5C 0%, rgba(15,31,92,0.94) 28%, rgba(15,31,92,0.72) 44%, rgba(15,31,92,0.22) 64%, rgba(15,31,92,0) 82%)'
+                      : 'linear-gradient(90deg, #FFFFFF 0%, rgba(244,248,255,0.95) 28%, rgba(244,248,255,0.74) 44%, rgba(244,248,255,0.18) 64%, rgba(244,248,255,0) 82%)',
                   }}
                   aria-hidden="true"
                 />
-                {/* Mobile extra top/bottom readability scrim */}
+                {/* Mobile subtle readability scrim keeping hero photography bright */}
                 <div
                   className="absolute inset-0 lg:hidden"
                   style={{
                     background: isDarkSlide
-                      ? 'linear-gradient(180deg, rgba(15,31,92,0.88) 0%, rgba(15,31,92,0.72) 60%, rgba(15,31,92,0.9) 100%)'
-                      : 'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,248,255,0.82) 65%, rgba(234,241,255,0.94) 100%)',
+                      ? 'linear-gradient(180deg, rgba(15,31,92,0.76) 0%, rgba(15,31,92,0.58) 52%, rgba(15,31,92,0.82) 100%)'
+                      : 'linear-gradient(180deg, rgba(255,255,255,0.84) 0%, rgba(244,248,255,0.68) 52%, rgba(234,241,255,0.88) 100%)',
                   }}
                   aria-hidden="true"
                 />
@@ -661,6 +677,131 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* E.5) SEE OUR PLANT IN ACTION: 3-Photo Real MY CONCRETE Showcase */}
+      <section className="bg-[var(--bg)] py-12 lg:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold text-[#D92B25] mb-1.5">
+                Real Kotihal Batching &amp; Brick Unit Photos
+              </p>
+              <h2 className="font-display font-extrabold uppercase tracking-tight text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white">
+                SEE OUR PLANT IN ACTION
+              </h2>
+            </div>
+            <Link
+              to="/gallery"
+              className="group btn-blue-pill px-5 py-2.5 text-xs sm:text-sm self-start sm:self-auto"
+            >
+              <span>View Full Gallery</span>
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+            {/* Large Primary Showcase Photo */}
+            <Link
+              to="/gallery"
+              className="group relative lg:col-span-7 min-h-[280px] sm:min-h-[380px] lg:min-h-[440px] rounded-[20px] overflow-hidden shadow-[0_18px_40px_-14px_rgba(15,31,92,0.22)] border border-[#D7E4FF] dark:border-[#264096] bg-[#0F1F5C]"
+            >
+              <img
+                src="/images/home/mixer-plant-card.webp"
+                alt="Transit mixer ready for dispatch under the batching chute at MY CONCRETE Kotihal"
+                width={960}
+                height={720}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+              />
+              <div
+                className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#0F1F5C]/90 via-[#0F1F5C]/45 to-transparent pointer-events-none"
+                aria-hidden="true"
+              />
+              <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex items-end justify-between gap-3">
+                <div>
+                  <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-[#FFC93C] mb-1">
+                    24/7 Dispatch
+                  </span>
+                  <p className="font-display font-bold text-lg sm:text-xl text-white">
+                    Transit mixer ready for dispatch
+                  </p>
+                </div>
+                <span className="w-9 h-9 rounded-full bg-white/15 backdrop-blur-xs text-white flex items-center justify-center shrink-0 group-hover:bg-[#D92B25] transition-colors">
+                  <ArrowRight className="w-4 h-4" />
+                </span>
+              </div>
+            </Link>
+
+            {/* 2 Stacked Secondary Showcase Photos */}
+            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-5">
+              <Link
+                to="/gallery"
+                className="group relative min-h-[210px] rounded-[20px] overflow-hidden shadow-[0_14px_32px_-12px_rgba(15,31,92,0.18)] border border-[#D7E4FF] dark:border-[#264096] bg-[#0F1F5C]"
+              >
+                <img
+                  src="/images/home/plant-silos-card.webp"
+                  alt="MY CONCRETE twin cement and fly-ash storage silos at Kotihal plant"
+                  width={900}
+                  height={675}
+                  loading="lazy"
+                  decoding="async"
+                  style={{ objectPosition: 'center 40%' }}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                />
+                <div
+                  className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0F1F5C]/90 via-[#0F1F5C]/45 to-transparent pointer-events-none"
+                  aria-hidden="true"
+                />
+                <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 flex items-end justify-between gap-2">
+                  <div>
+                    <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-[#FFC93C] mb-0.5">
+                      Batching Unit
+                    </span>
+                    <p className="font-display font-bold text-base sm:text-lg text-white">
+                      Storage silos at our Kotihal plant
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-white/90 shrink-0 transition-transform group-hover:translate-x-1" />
+                </div>
+              </Link>
+
+              <Link
+                to="/gallery"
+                className="group relative min-h-[210px] rounded-[20px] overflow-hidden shadow-[0_14px_32px_-12px_rgba(15,31,92,0.18)] border border-[#D7E4FF] dark:border-[#264096] bg-[#0F1F5C]"
+              >
+                <img
+                  src="/images/home/brick-yard-card.webp"
+                  alt="MY CONCRETE cement bricks and solid blocks curing in rows at the Kotihal yard"
+                  width={960}
+                  height={720}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                />
+                <div
+                  className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0F1F5C]/90 via-[#0F1F5C]/45 to-transparent pointer-events-none"
+                  aria-hidden="true"
+                />
+                <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 flex items-end justify-between gap-2">
+                  <div>
+                    <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-[#FFC93C] mb-0.5">
+                      Masonry Yard
+                    </span>
+                    <p className="font-display font-bold text-base sm:text-lg text-white">
+                      Cement bricks curing in our yard
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-white/90 shrink-0 transition-transform group-hover:translate-x-1" />
+                </div>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* F) REAL-TIME DELIVERY STATUS INDICATOR & LIVE DISPATCH DEMAND */}
+      <DeliveryStatusWidget />
 
       {/* 2. WHY CHOOSE US (4 Feature Cards) */}
       <section className="relative bg-[var(--bg)]">
@@ -878,48 +1019,129 @@ export function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {products.map((p) => (
-              <div key={p.slug} className="warm-card overflow-hidden flex flex-col justify-between">
-                <div>
-                  <div className="h-40">
-                    <VisualPlate
-                      imageUrl={p.imageUrl}
-                      variant={p.unitType === 'pieces' ? 'bricks' : 'product-mix'}
-                      title={p.name}
-                      subtitle={p.category}
-                    />
+            {products.map((p) => {
+              const fallbackImage =
+                p.slug === 'cement-bricks'
+                  ? '/images/home/brick-stacks-card.webp'
+                  : p.slug === 'standard-grades'
+                  ? '/images/home/mixer-plant-card.webp'
+                  : p.slug === 'specialty-concrete'
+                  ? '/images/home/slab-rebar-card.webp'
+                  : '/images/home/plant-silos-card.webp';
+              const productImg = p.imageUrl || fallbackImage;
+
+              return (
+                <div key={p.slug} className="warm-card overflow-hidden flex flex-col justify-between">
+                  <div>
+                    <div className="h-44 overflow-hidden">
+                      <VisualPlate
+                        imageUrl={productImg}
+                        variant={p.unitType === 'pieces' ? 'bricks' : 'product-mix'}
+                        title={p.name}
+                        alt={`${p.name} supplied by MY CONCRETE Kotihal for Ranebennur & Davangere`}
+                        width={960}
+                        height={720}
+                        subtitle={p.category}
+                      />
+                    </div>
+                    <div className="p-5 space-y-2">
+                      <p className="text-xs font-semibold text-[#1F3FA8] dark:text-[#FFC93C]">
+                        {p.category} · {p.unitType === 'pieces' ? 'Per Piece' : 'Per m³'}
+                      </p>
+                      <h3 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
+                        {p.name}
+                      </h3>
+                      <p className="text-xs text-[var(--muted)] leading-relaxed">{p.tagline}</p>
+                    </div>
                   </div>
-                  <div className="p-5 space-y-2">
-                    <p className="text-xs font-semibold text-[#1F3FA8] dark:text-[#FFC93C]">
-                      {p.category} · {p.unitType === 'pieces' ? 'Per Piece' : 'Per m³'}
-                    </p>
-                    <h3 className="font-display font-bold text-base text-[#0F1F5C] dark:text-white">
-                      {p.name}
-                    </h3>
-                    <p className="text-xs text-[var(--muted)] leading-relaxed">{p.tagline}</p>
+                  <div className="px-5 pb-5 pt-2 flex items-center justify-between gap-2">
+                    <Link
+                      to={`/products/${p.slug}`}
+                      className="text-xs font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                    >
+                      Specs &amp; Grades &rarr;
+                    </Link>
+                    <Link
+                      to={`/book?product=${p.slug}`}
+                      className="btn-orange-pill px-3.5 py-1.5 text-xs"
+                    >
+                      Book
+                    </Link>
                   </div>
                 </div>
-                <div className="px-5 pb-5 pt-2 flex items-center justify-between gap-2">
-                  <Link
-                    to={`/products/${p.slug}`}
-                    className="text-xs font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
-                  >
-                    Specs & Grades &rarr;
-                  </Link>
-                  <Link
-                    to={`/book?product=${p.slug}`}
-                    className="btn-orange-pill px-3.5 py-1.5 text-xs"
-                  >
-                    Book
-                  </Link>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
 
-      <WaveDivider topColor="var(--bg-soft)" bottomColor="var(--bg)" flip />
+      {/* 5.5) ABOUT STRIP: Split layout with official MY CONCRETE Brand Poster */}
+      <section className="bg-[var(--bg)] border-y border-[#D7E4FF]/70 dark:border-[#264096]/70">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          <div className="lg:col-span-5 flex justify-center">
+            <div className="w-full max-w-[420px] rounded-[20px] overflow-hidden shadow-[0_24px_55px_-16px_rgba(15,31,92,0.28)] border border-[#D7E4FF] dark:border-[#264096] bg-[#0F1F5C]">
+              <img
+                src="/images/home/brand-poster.webp"
+                alt="MY CONCRETE Kotihal & Davangere Ready-Mix Concrete and Cement Bricks 24-hour dispatch unit"
+                width={960}
+                height={1080}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-auto object-cover"
+              />
+            </div>
+          </div>
+
+          <div className="lg:col-span-7 space-y-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#D92B25]">
+              About MY CONCRETE
+            </p>
+            <h2 className="font-display font-extrabold text-2xl sm:text-4xl text-[#0F1F5C] dark:text-white leading-tight">
+              Your Regional Batching &amp; Masonry Partner in Kotihal
+            </h2>
+            <p className="text-base text-[var(--muted)] leading-relaxed">
+              MY CONCRETE – Readymix Concrete Unit operates out of Kotihal (inside Lucky Artificial Sand Industry premises) to supply dependable Ready-Mix Concrete and machine-pressed Cement Bricks across{' '}
+              <strong className="text-[#0F1F5C] dark:text-white">Ranebennur &amp; Davangere</strong>{' '}
+              and neighbouring towns.
+            </p>
+            <p className="text-sm text-[var(--muted)] leading-relaxed">
+              Whether you are casting an individual house roof slab, pouring industrial warehouse flooring, or building compound walls with 4&quot;, 6&quot;, or 8&quot; solid blocks, our unit stays{' '}
+              <strong className="text-[#0F1F5C] dark:text-white">Open 24 Hours</strong> so every concrete pour and brick load arrives when your site team is ready.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-sm text-[#0F1F5C] dark:text-slate-100">
+              {[
+                'Batching plant at FM66+2X6, Kotihal (near Ranebennur)',
+                'Regional coverage across Ranebennur, Davangere & Harihar',
+                'Ready-mix concrete (M5–M40+) & solid cement bricks',
+                'Open 24 hours across all days for day & night pours',
+              ].map((fact) => (
+                <div key={fact} className="flex items-start gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-[#1F3FA8]/12 dark:bg-[#264096] text-[#1F3FA8] dark:text-[#FFC93C] flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </span>
+                  <span>{fact}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 flex flex-wrap items-center gap-3">
+              <Link to="/about/our-story" className="group btn-blue-pill px-6 py-3 text-sm">
+                <span>Learn More</span>
+                <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+              <Link
+                to="/book"
+                className="rounded-full border border-[#D7E4FF] dark:border-[#264096] px-6 py-3 text-sm font-semibold text-[#0F1F5C] dark:text-white hover:border-[#D92B25] transition-colors"
+              >
+                Book 24/7 Slot
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <WaveDivider topColor="var(--bg)" bottomColor="var(--bg)" flip />
 
       {/* 6. THE DIFFERENCE (Residential, Infrastructure, Industrial) */}
       <section className="bg-[var(--bg)]">
@@ -961,7 +1183,6 @@ export function HomePage() {
               >
                 <div className="h-44 overflow-hidden">
                   <VisualPlate
-                    imageUrl={`/images/customers/${seg.slug}-card.webp`}
                     variant={seg.variant}
                     title={seg.title}
                     width={800}
@@ -1094,96 +1315,24 @@ export function HomePage() {
 
       <WaveDivider topColor="var(--bg-soft)" bottomColor="var(--bg)" flip />
 
-      {/* 10. SERVICE AREA MAP (Kotihal & Davangere Units -> Ranebennur & Davangere) */}
+      {/* 10. SERVICE AREA MAP & INTERACTIVE DELIVERY FEASIBILITY (Ranebennur & Davangere Zones) */}
       <section className="bg-[var(--bg)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-          <div className="lg:col-span-5 space-y-4">
-            <p className="text-xs font-semibold text-[#D92B25]">Live Plant &amp; Delivery Radius</p>
-            <h2 className="font-display font-bold text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white">
-              {t('serviceAreaTitle')}
-            </h2>
-            <p className="text-sm text-[var(--muted)] leading-relaxed">
-              Dispatched from our Kotihal &amp; Davangere units within a{' '}
-              <strong className="tabular-nums">{biz?.serviceRadiusKm || 50} km</strong> corridor covering Ranebennur, Davangere, Harihar, Byadgi, and Haveri.
-            </p>
-
-            <div className="space-y-3">
-              {plantLocations.map((loc) => {
-                const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
-                const locDirections =
-                  loc.googleMapsUrl ||
-                  `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
-                return (
-                  <div
-                    key={loc.id}
-                    className="rounded-[16px] bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-2 text-xs"
-                  >
-                    <div className="flex items-start gap-2.5">
-                      <span
-                        className={`inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-full text-[10px] font-extrabold text-white mt-0.5 ${
-                          isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
-                        }`}
-                      >
-                        {isRed ? (
-                          <MapPin className="w-3.5 h-3.5" />
-                        ) : (
-                          'MC'
-                        )}
-                      </span>
-                      <div className="min-w-0 space-y-0.5">
-                        <p className="font-display font-bold text-sm text-[#0F1F5C] dark:text-white">
-                          {loc.name}
-                        </p>
-                        <p className="text-[var(--muted)] leading-snug">{loc.address}</p>
-                        <p className="text-emerald-600 dark:text-emerald-400 font-semibold">{loc.hours}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3 pl-8 pt-0.5">
-                      <CallLink
-                        phone={loc.phone || biz?.phone || '+91 73378 07372'}
-                        whatsapp={loc.whatsapp || loc.phone || biz?.whatsapp || '+91 73378 07372'}
-                        className="tabular-nums font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
-                      >
-                        {loc.phone}
-                      </CallLink>
-                      <a
-                        href={locDirections}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 font-semibold text-[#0F1F5C] dark:text-slate-200 hover:text-[#D92B25]"
-                      >
-                        <Navigation className="w-3 h-3" />
-                        <span>Get Directions</span>
-                      </a>
-                      <Link
-                        to={`/book?plant=${encodeURIComponent(loc.id)}`}
-                        className="font-semibold text-[#D92B25] hover:underline"
-                      >
-                        Book Delivery &rarr;
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="rounded-[16px] bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-3.5 space-y-1 text-xs">
-              <p className="font-semibold text-[#0F1F5C] dark:text-white flex flex-wrap items-center gap-2">
-                <Award className="w-4 h-4 text-[#D92B25] shrink-0" />
-                <span>24-Hour Dispatch Desk:</span>
-                <CallLink
-                  phone={biz?.phone || '+91 73378 07372'}
-                  whatsapp={biz?.whatsapp || biz?.phone || '+91 73378 07372'}
-                  className="tabular-nums text-[#1F3FA8] dark:text-[#FFC93C] hover:underline inline-flex items-center min-h-[44px] md:min-h-0"
-                >
-                  {biz?.phone || '+91 73378 07372'}
-                </CallLink>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 space-y-8">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+            <div className="space-y-2 max-w-2xl">
+              <p className="text-xs font-semibold text-[#D92B25]">
+                Interactive Service Zones &amp; Feasibility Check
               </p>
-              <p className="text-[var(--muted)]">
-                Pin your exact delivery spot in the booking wizard to auto-check distance from either unit.
+              <h2 className="font-display font-bold text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white">
+                {t('serviceAreaTitle')}
+              </h2>
+              <p className="text-sm text-[var(--muted)] leading-relaxed">
+                Dispatched from our Kotihal &amp; Davangere units within a{' '}
+                <strong className="tabular-nums">{biz?.serviceRadiusKm || 50} km</strong> corridor covering Ranebennur, Davangere, Harihar, Byadgi, and Haveri. Filter a zone, tap any town, or click on the map to verify delivery feasibility.
               </p>
             </div>
-            <div className="flex flex-wrap gap-3">
+
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
               <a
                 href={directionsUrl}
                 target="_blank"
@@ -1202,63 +1351,103 @@ export function HomePage() {
             </div>
           </div>
 
-          <div className="lg:col-span-7">
-            {biz && (
-              <PlantMap
-                plantLat={biz.plantLat}
-                plantLng={biz.plantLng}
-                serviceRadiusKm={biz.serviceRadiusKm}
-                plantName={biz.businessName}
-                plantAddress={biz.address}
-                locations={plantLocations}
-                googleMapsUrl={biz.googleMapsUrl}
-                heightClass="h-[400px]"
-              />
-            )}
+          {biz && (
+            <ServiceZoneExplorer
+              biz={biz}
+              plantLocations={plantLocations}
+              mapHeightClass="h-[420px]"
+            />
+          )}
+
+          {/* Plant Unit Directory + 24-Hour Dispatch Desk */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+            {plantLocations.map((loc) => {
+              const isRed = loc.pinColor === 'red' || (!loc.isPrimary && loc.pinColor !== 'blue');
+              const locDirections =
+                loc.googleMapsUrl ||
+                `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+              return (
+                <div
+                  key={loc.id}
+                  className="rounded-[16px] bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-2 text-xs flex flex-col justify-between"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span
+                      className={`inline-flex items-center justify-center shrink-0 w-6 h-6 rounded-full text-[10px] font-extrabold text-white mt-0.5 ${
+                        isRed ? 'bg-[#D92B25]' : 'bg-[#1F3FA8]'
+                      }`}
+                    >
+                      {isRed ? <MapPin className="w-3.5 h-3.5" /> : 'MC'}
+                    </span>
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="font-display font-bold text-sm text-[#0F1F5C] dark:text-white">
+                        {loc.name}
+                      </p>
+                      <p className="text-[var(--muted)] leading-snug">{loc.address}</p>
+                      <p className="text-emerald-600 dark:text-emerald-400 font-semibold">{loc.hours}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 pl-8 pt-1">
+                    <CallLink
+                      phone={loc.phone || biz?.phone || '+91 73378 07372'}
+                      whatsapp={loc.whatsapp || loc.phone || biz?.whatsapp || '+91 73378 07372'}
+                      className="tabular-nums font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                    >
+                      {loc.phone}
+                    </CallLink>
+                    <a
+                      href={locDirections}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-semibold text-[#0F1F5C] dark:text-slate-200 hover:text-[#D92B25]"
+                    >
+                      <Navigation className="w-3 h-3" />
+                      <span>Get Directions</span>
+                    </a>
+                    <Link
+                      to={`/book?plant=${encodeURIComponent(loc.id)}`}
+                      className="font-semibold text-[#D92B25] hover:underline"
+                    >
+                      Book Delivery &rarr;
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
+
+            <div className="rounded-[16px] bg-[var(--surface)] border border-[#D7E4FF] dark:border-[#264096] p-4 space-y-2 text-xs flex flex-col justify-between">
+              <div className="space-y-1.5">
+                <p className="font-semibold text-[#0F1F5C] dark:text-white flex items-center gap-2 text-sm">
+                  <Award className="w-4 h-4 text-[#D92B25] shrink-0" />
+                  <span>24-Hour Dispatch Desk</span>
+                </p>
+                <p className="text-[var(--muted)] leading-relaxed">
+                  Need bulk fleet scheduling across Ranebennur, Davangere, or Harihar? Speak directly with our dispatch coordinator.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <CallLink
+                  phone={biz?.phone || '+91 73378 07372'}
+                  whatsapp={biz?.whatsapp || biz?.phone || '+91 73378 07372'}
+                  className="tabular-nums font-bold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
+                >
+                  {biz?.phone || '+91 73378 07372'}
+                </CallLink>
+                <Link to="/tools/plant-locator" className="font-semibold text-[#D92B25] hover:underline">
+                  Full Plant Locator &rarr;
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 11. TESTIMONIALS (Rendered only when real client testimonials are added in Admin) */}
-      {testimonials.length > 0 && (
-        <>
-          <WaveDivider topColor="var(--bg)" bottomColor="var(--bg-soft)" />
-          <section className="bg-[var(--bg-soft)]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16">
-              <div className="mb-8">
-                <p className="text-xs font-semibold text-[#D92B25] mb-2">Verified Feedback</p>
-                <h2 className="font-display font-bold text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white">
-                  {t('testimonialsTitle')}
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {testimonials.map((item) => (
-                  <div key={item.id} className="warm-card p-6 space-y-4 flex flex-col justify-between">
-                    <div className="space-y-3">
-                      <Quote className="w-6 h-6 text-[#D92B25]" />
-                      <p className="text-sm text-[var(--text)] leading-relaxed">&ldquo;{item.quote}&rdquo;</p>
-                    </div>
-                    <div className="border-t border-[#D7E4FF] dark:border-[#264096] pt-3 text-xs">
-                      <p className="font-bold text-[#0F1F5C] dark:text-white">{item.author_name}</p>
-                      <p className="text-[var(--muted)]">
-                        {item.role_or_company}
-                        {item.location ? ` · ${item.location}` : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
-        </>
-      )}
+      {/* 11. CUSTOMER SUCCESS STORIES (Feedback, Star Rating System & Project Photos) */}
+      <WaveDivider topColor="var(--bg)" bottomColor="var(--bg-soft)" />
+      <CustomerSuccessStories testimonials={testimonials} />
 
       {/* 12. HOME FAQ ACCORDION + TECHNICAL ARTICLES */}
-      <WaveDivider
-        topColor={testimonials.length > 0 ? 'var(--bg-soft)' : 'var(--bg)'}
-        bottomColor="var(--bg)"
-      />
+      <WaveDivider topColor="var(--bg-soft)" bottomColor="var(--bg)" />
       <section className="bg-[var(--bg)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 space-y-16">
           {/* FAQ */}

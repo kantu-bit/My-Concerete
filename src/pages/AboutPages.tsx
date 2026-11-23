@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { PlantMap } from '../components/PlantMap.tsx';
 import { ConnectForm } from '../components/ConnectForm.tsx';
-import { CallLink, EmailLink } from '../components/ContactLinks.tsx';
+import { CallLink, MailLink } from '../components/ContactLinks.tsx';
 
 function isKnown(val?: string): boolean {
   return Boolean(val && val.trim().length > 0 && !val.includes('[') && !val.includes(']'));
@@ -236,12 +236,12 @@ export function PlantLocationPage() {
                   </p>
                   <p>
                     Email:{' '}
-                    <EmailLink
+                    <MailLink
                       email={biz?.email || 'myconcretektl@gmail.com'}
                       className="font-semibold text-[#1F3FA8] dark:text-[#FFC93C] hover:underline"
                     >
                       {biz?.email || 'myconcretektl@gmail.com'}
-                    </EmailLink>
+                    </MailLink>
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2.5 pt-1">

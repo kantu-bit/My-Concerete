@@ -107,6 +107,8 @@ interface SiteVisitRecord {
   email_error?: string;
   whatsapp_status?: string;
   whatsapp_error?: string;
+  notify_email_status?: string;
+  notify_whatsapp_status?: string;
   notified_at?: string;
   created_at: string;
 }
@@ -167,6 +169,11 @@ interface AdminOverviewData {
     phone: string;
     email: string;
     city: string;
+    siteAddress?: string;
+    landmark?: string;
+    gstNumber?: string;
+    siteLat?: number;
+    siteLng?: number;
     totalOrders: number;
     totalM3: number;
   }>;
@@ -375,6 +382,12 @@ export function AdminDashboardPage({
     authorName: '',
     roleOrCompany: '',
     location: 'Ranebennur',
+    projectTitle: '',
+    segment: 'Residential',
+    gradeUsed: 'M25 Slab Concrete',
+    volumeNote: '',
+    projectImageUrl: '',
+    rating: 5,
     quote: '',
   });
   const [newBlog, setNewBlog] = useState({
@@ -1751,8 +1764,8 @@ export function AdminDashboardPage({
                       ) : (
                         filteredBookings.map((b) => {
                           const isUnread = Number(b.is_read ?? 1) === 0;
-                          const emailSt = b.email_status || 'pending';
-                          const waSt = b.whatsapp_status || 'pending';
+                          const emailSt = b.notify_email_status || b.email_status || 'pending';
+                          const waSt = b.notify_whatsapp_status || b.whatsapp_status || 'pending';
                           return (
                             <tr
                               key={b.id || b.booking_code}
@@ -1950,8 +1963,8 @@ export function AdminDashboardPage({
                     ) : (
                       (overview.siteVisits || []).map((sv) => {
                         const isUnread = Number(sv.is_read ?? 1) === 0;
-                        const emailSt = sv.email_status || 'pending';
-                        const waSt = sv.whatsapp_status || 'pending';
+                        const emailSt = sv.notify_email_status || sv.email_status || 'pending';
+                        const waSt = sv.notify_whatsapp_status || sv.whatsapp_status || 'pending';
                         return (
                           <tr
                             key={sv.id}
@@ -2114,8 +2127,8 @@ export function AdminDashboardPage({
                   {(overview.quotes || []).map((q) => {
                     const qId = Number(q.id);
                     const isUnread = Number(q.is_read ?? 1) === 0;
-                    const emailSt = String(q.email_status || 'pending');
-                    const waSt = String(q.whatsapp_status || 'pending');
+                    const emailSt = String(q.notify_email_status || q.email_status || 'pending');
+                    const waSt = String(q.notify_whatsapp_status || q.whatsapp_status || 'pending');
                     const emailErr = String(q.email_error || '');
                     const waErr = String(q.whatsapp_error || '');
                     return (
@@ -2238,8 +2251,8 @@ export function AdminDashboardPage({
                     {(overview.enquiries || []).map((enq) => {
                       const eId = Number(enq.id);
                       const isUnread = Number(enq.is_read ?? 1) === 0;
-                      const emailSt = String(enq.email_status || 'pending');
-                      const waSt = String(enq.whatsapp_status || 'pending');
+                      const emailSt = String(enq.notify_email_status || enq.email_status || 'pending');
+                      const waSt = String(enq.notify_whatsapp_status || enq.whatsapp_status || 'pending');
                       const emailErr = String(enq.email_error || '');
                       const waErr = String(enq.whatsapp_error || '');
                       return (
@@ -2326,8 +2339,8 @@ export function AdminDashboardPage({
                   <div className="divide-y divide-[#D7E4FF] dark:divide-[#264096] text-xs">
                     {(overview.siteVisits || []).map((sv) => {
                       const isUnread = Number(sv.is_read ?? 1) === 0;
-                      const emailSt = sv.email_status || 'pending';
-                      const waSt = sv.whatsapp_status || 'pending';
+                      const emailSt = sv.notify_email_status || sv.email_status || 'pending';
+                      const waSt = sv.notify_whatsapp_status || sv.whatsapp_status || 'pending';
                       return (
                         <div
                           key={String(sv.id)}
@@ -3408,6 +3421,19 @@ export function AdminDashboardPage({
                       </div>
                     ))}
                   </div>
+                  {(!overview.envCredentialStatus.smtpConfigured && !overview.envCredentialStatus.resendConfigured) ||
+                  (!overview.envCredentialStatus.callmebotConfigured &&
+                    !overview.envCredentialStatus.cloudapiConfigured &&
+                    !overview.envCredentialStatus.twilioConfigured) ? (
+                    <p className="text-[11px] text-amber-700 dark:text-amber-300 pt-1">
+                      Automatic delivery requires credentials in your server <code className="font-mono">.env</code> (or
+                      Supabase Edge Function secrets): set <code className="font-mono">SMTP_USER</code> +{' '}
+                      <code className="font-mono">SMTP_PASS</code> (Gmail 16-char App Password) or{' '}
+                      <code className="font-mono">RESEND_API_KEY</code> for Email, and{' '}
+                      <code className="font-mono">CALLMEBOT_APIKEY</code> (or Meta Cloud API / Twilio keys) for WhatsApp,
+                      then restart the server.
+                    </p>
+                  ) : null}
                 </div>
               )}
 
@@ -4186,10 +4212,10 @@ export function AdminDashboardPage({
                 </div>
               </div>
 
-              {/* Testimonials */}
+              {/* Testimonials / Customer Success Stories */}
               <div className="warm-card p-5 space-y-3">
                 <h3 className="font-display font-bold text-sm">
-                  Client Testimonials ({siteData?.testimonials.length || 0})
+                  Customer Success Stories ({siteData?.testimonials.length || 0})
                 </h3>
                 <div className="space-y-2">
                   <input
@@ -4215,6 +4241,59 @@ export function AdminDashboardPage({
                       className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2.5 py-1.5"
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Project Title (e.g. Villa Roof Slab)"
+                      value={newTestimonial.projectTitle}
+                      onChange={(e) => setNewTestimonial({ ...newTestimonial, projectTitle: e.target.value })}
+                      className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2.5 py-1.5"
+                    />
+                    <select
+                      value={newTestimonial.segment}
+                      onChange={(e) => setNewTestimonial({ ...newTestimonial, segment: e.target.value })}
+                      className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2.5 py-1.5"
+                    >
+                      <option value="Residential">Residential</option>
+                      <option value="Commercial">Commercial</option>
+                      <option value="Industrial">Industrial</option>
+                      <option value="Infrastructure">Infrastructure</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Grade (e.g. M25)"
+                      value={newTestimonial.gradeUsed}
+                      onChange={(e) => setNewTestimonial({ ...newTestimonial, gradeUsed: e.target.value })}
+                      className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2.5 py-1.5"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Volume (e.g. 38 m³)"
+                      value={newTestimonial.volumeNote}
+                      onChange={(e) => setNewTestimonial({ ...newTestimonial, volumeNote: e.target.value })}
+                      className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2.5 py-1.5"
+                    />
+                    <select
+                      value={newTestimonial.rating}
+                      onChange={(e) => setNewTestimonial({ ...newTestimonial, rating: Number(e.target.value) })}
+                      className="rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2.5 py-1.5"
+                    >
+                      <option value={5}>5 Stars</option>
+                      <option value={4}>4 Stars</option>
+                      <option value={3}>3 Stars</option>
+                      <option value={2}>2 Stars</option>
+                      <option value={1}>1 Star</option>
+                    </select>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Project Photo URL (optional)"
+                    value={newTestimonial.projectImageUrl}
+                    onChange={(e) => setNewTestimonial({ ...newTestimonial, projectImageUrl: e.target.value })}
+                    className="w-full rounded-lg border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-2.5 py-1.5"
+                  />
                   <textarea
                     rows={2}
                     placeholder="Client quote"
@@ -4233,20 +4312,34 @@ export function AdminDashboardPage({
                         body: JSON.stringify(newTestimonial),
                       });
                       if (handleApiAuthFailure(res)) return;
-                      setNewTestimonial({ authorName: '', roleOrCompany: '', location: 'Ranebennur', quote: '' });
+                      setNewTestimonial({
+                        authorName: '',
+                        roleOrCompany: '',
+                        location: 'Ranebennur',
+                        projectTitle: '',
+                        segment: 'Residential',
+                        gradeUsed: 'M25 Slab Concrete',
+                        volumeNote: '',
+                        projectImageUrl: '',
+                        rating: 5,
+                        quote: '',
+                      });
                       await refreshBootstrap();
-                      showToast('Testimonial added.');
+                      showToast('Success story added.');
                     }}
                     className="btn-blue-pill px-3 py-1.5 font-semibold"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Add Testimonial</span>
+                    <span>Add Success Story</span>
                   </button>
                 </div>
                 <div className="divide-y divide-[#D7E4FF] dark:divide-[#264096] pt-2">
                   {(siteData?.testimonials || []).map((tm) => (
                     <div key={tm.id} className="py-2 flex items-center justify-between gap-2">
-                      <span className="truncate">{tm.author_name} ({tm.location})</span>
+                      <span className="truncate">
+                        {tm.rating || 5}★ · {tm.author_name} ({tm.location})
+                        {tm.project_title ? ` — ${tm.project_title}` : ''}
+                      </span>
                       <button
                         type="button"
                         onClick={async () => {
@@ -4470,26 +4563,50 @@ export function AdminDashboardPage({
                     <th className="px-4 py-3">City</th>
                     <th className="px-4 py-3 text-right">Orders</th>
                     <th className="px-4 py-3 text-right">Concrete Vol (m³)</th>
+                    <th className="px-4 py-3 text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#D7E4FF] dark:divide-[#264096]">
                   {overview.customers.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-[var(--muted)]">
+                      <td colSpan={7} className="px-4 py-8 text-center text-[var(--muted)]">
                         Customers will appear automatically after the first booking.
                       </td>
                     </tr>
                   ) : (
-                    overview.customers.map((c) => (
-                      <tr key={c.phone}>
-                        <td className="px-4 py-3 font-semibold">{c.name}</td>
-                        <td className="px-4 py-3 tabular-nums">{c.phone}</td>
-                        <td className="px-4 py-3">{c.email || '—'}</td>
-                        <td className="px-4 py-3">{c.city}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{c.totalOrders}</td>
-                        <td className="px-4 py-3 text-right font-mono tabular-nums">{c.totalM3}</td>
-                      </tr>
-                    ))
+                    overview.customers.map((c) => {
+                      const bookParams = new URLSearchParams();
+                      if (c.name) bookParams.set('customerName', c.name);
+                      if (c.phone) bookParams.set('phone', c.phone);
+                      if (c.email) bookParams.set('email', c.email);
+                      if (c.siteAddress) bookParams.set('address', c.siteAddress);
+                      if (c.city) bookParams.set('city', c.city);
+                      if (c.landmark) bookParams.set('landmark', c.landmark);
+                      if (c.gstNumber) bookParams.set('gst', c.gstNumber);
+                      return (
+                        <tr key={c.phone}>
+                          <td className="px-4 py-3 font-semibold">{c.name}</td>
+                          <td className="px-4 py-3 tabular-nums">{c.phone}</td>
+                          <td className="px-4 py-3">{c.email || '—'}</td>
+                          <td className="px-4 py-3">
+                            <span>{c.city}</span>
+                            {c.siteAddress && (
+                              <p className="text-[11px] text-[var(--muted)] truncate max-w-[200px]">{c.siteAddress}</p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">{c.totalOrders}</td>
+                          <td className="px-4 py-3 text-right font-mono tabular-nums">{c.totalM3}</td>
+                          <td className="px-4 py-3 text-right">
+                            <Link
+                              to={`/book?${bookParams.toString()}`}
+                              className="inline-flex items-center gap-1 rounded-lg bg-[#1F3FA8] text-white px-2.5 py-1 font-semibold hover:bg-[#173187]"
+                            >
+                              Book Now
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -4904,8 +5021,8 @@ export function AdminDashboardPage({
             {(() => {
               const liveBooking =
                 overview?.bookings.find((item) => item.id === viewingBooking.id) || viewingBooking;
-              const emailSt = liveBooking.email_status || 'pending';
-              const waSt = liveBooking.whatsapp_status || 'pending';
+              const emailSt = liveBooking.notify_email_status || liveBooking.email_status || 'pending';
+              const waSt = liveBooking.notify_whatsapp_status || liveBooking.whatsapp_status || 'pending';
               return (
                 <div className="rounded-xl bg-[var(--bg)] border border-[#D7E4FF] dark:border-[#264096] p-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1">

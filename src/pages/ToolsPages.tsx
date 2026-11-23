@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
-import { PlantMap } from '../components/PlantMap.tsx';
+import { ServiceZoneExplorer } from '../components/ServiceZoneExplorer.tsx';
 import { CallLink } from '../components/ContactLinks.tsx';
 
 type ElementType = 'slab' | 'beam' | 'column' | 'footing' | 'wall';
@@ -887,15 +887,10 @@ export function PlantLocatorPage() {
       </div>
 
       {biz && (
-        <PlantMap
-          plantLat={biz.plantLat}
-          plantLng={biz.plantLng}
-          serviceRadiusKm={biz.serviceRadiusKm}
-          plantName={biz.businessName}
-          plantAddress={biz.address}
-          locations={plantLocations}
-          googleMapsUrl={biz.googleMapsUrl}
-          heightClass="h-[460px]"
+        <ServiceZoneExplorer
+          biz={biz}
+          plantLocations={plantLocations}
+          mapHeightClass="h-[460px]"
         />
       )}
 

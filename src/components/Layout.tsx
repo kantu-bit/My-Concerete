@@ -9,6 +9,7 @@ import {
   MessageCircle,
   Moon,
   Phone,
+  Search,
   Sun,
   X,
 } from 'lucide-react';
@@ -16,7 +17,9 @@ import { useApp } from '../context/AppContext.tsx';
 import { buildWhatsAppUrl, cleanPhoneDigits, isPlaceholderValue } from '../utils/documents.ts';
 import { ConnectForm } from './ConnectForm.tsx';
 import { BrandLogo } from './BrandLogo.tsx';
-import { CallLink, CopyPhoneButton, EmailLink } from './ContactLinks.tsx';
+import { CallLink, CopyPhoneButton, MailLink } from './ContactLinks.tsx';
+import { GlobalHeaderSearch, GlobalSearchModal } from './GlobalSearch.tsx';
+import { CONTACT_CONFIG } from '../config/contact.ts';
 
 function SocialGlyph({ name }: { name: 'facebook' | 'instagram' | 'youtube' | 'whatsapp' | 'linkedin' }) {
   switch (name) {
@@ -62,6 +65,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [mobileAccordion, setMobileAccordion] = useState<string | null>(null);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -76,15 +80,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setMobileMenuOpen(false);
     setOpenDropdown(null);
+    setSearchModalOpen(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        if (window.scrollY > 84 || window.innerWidth < 1024) {
+          e.preventDefault();
+          setSearchModalOpen((prev) => !prev);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const biz = data?.businessConfig;
   const products = (data?.products || []).filter((p) => p.isOffered);
   const rmcProducts = products.filter((p) => p.unitType !== 'pieces');
 
-  const phoneDisplay = biz?.phone || '+91 73378 07372';
-  const emailDisplay = biz?.email || 'myconcretektl@gmail.com';
-  const whatsappDisplay = biz?.whatsapp || biz?.phone || '+91 73378 07372';
+  const phoneDisplay = biz?.phone || CONTACT_CONFIG.phoneDisplay;
+  const emailDisplay = biz?.email || CONTACT_CONFIG.email;
+  const whatsappDisplay = biz?.whatsapp || biz?.phone || CONTACT_CONFIG.whatsappDisplay;
 
   const whatsappHref = buildWhatsAppUrl(
     whatsappDisplay,
@@ -109,14 +127,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg)] text-[var(--text)]">
       {/* A) TOP BAR: Solid brand blue #1F3FA8 (~84px desktop, compact mobile) */}
-      <header className="bg-[#1F3FA8] text-white relative z-40">
+      <header className="bg-[#1F3FA8] text-white relative z-50">
         {/* Desktop Top Bar */}
-        <div className="hidden lg:flex max-w-[1440px] mx-auto px-6 xl:px-12 h-[84px] items-center justify-between gap-6">
+        <div className="hidden lg:flex max-w-[1440px] mx-auto px-6 xl:px-12 h-[84px] items-center justify-between gap-4 xl:gap-6">
           <Link to="/" className="shrink-0" aria-label="MY CONCRETE Home">
             <BrandLogo onWhitePlate plateSize="topbar" />
           </Link>
 
-          <div className="flex items-center gap-8 text-[15px] font-sans relative z-50">
+          {/* Global Header Search Bar */}
+          <div className="flex-1 max-w-[260px] xl:max-w-[340px] min-w-[190px] relative z-[60]">
+            <GlobalHeaderSearch variant="desktop-inline" />
+          </div>
+
+          <div className="flex items-center gap-4 xl:gap-6 text-[14px] xl:text-[15px] font-sans relative z-50 shrink-0">
             <CallLink
               phone={phoneDisplay}
               whatsapp={whatsappDisplay}
@@ -128,7 +151,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <span className="tabular-nums font-medium">{phoneDisplay}</span>
             </CallLink>
 
-            <EmailLink
+            <MailLink
               email={emailDisplay}
               className="top-email hover:text-[#FFC93C] transition-colors whitespace-nowrap"
             >
@@ -136,9 +159,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Mail className="w-3.5 h-3.5" />
               </span>
               <span className="font-medium">{emailDisplay}</span>
-            </EmailLink>
+            </MailLink>
 
-            <div className="flex items-center gap-4">
+            <div className="hidden xl:flex items-center gap-3.5">
               {biz?.facebookUrl && !isPlaceholderValue(biz.facebookUrl) && (
                 <a
                   href={biz.facebookUrl}
@@ -217,13 +240,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Mobile Top Bar: logo left, call + lang + hamburger right */}
-        <div className="lg:hidden px-4 h-16 flex items-center justify-between gap-2">
+        {/* Mobile Top Bar: logo left, search + call + lang + hamburger right */}
+        <div className="lg:hidden px-3 sm:px-4 h-16 flex items-center justify-between gap-2">
           <Link to="/" className="shrink-0" aria-label="MY CONCRETE Home">
             <BrandLogo onWhitePlate compact />
           </Link>
 
-          <div className="flex items-center gap-2 relative z-50">
+          <div className="flex items-center gap-1.5 sm:gap-2 relative z-50">
+            <button
+              type="button"
+              onClick={() => setSearchModalOpen(true)}
+              aria-label="Open global search"
+              className="inline-flex items-center justify-center rounded-lg border border-white/40 min-h-[44px] min-w-[44px] text-white hover:border-[#FFC93C] hover:text-[#FFC93C] cursor-pointer"
+            >
+              <Search className="w-4 h-4 text-[#FFC93C]" />
+            </button>
             <CallLink
               phone={phoneDisplay}
               whatsapp={whatsappDisplay}
@@ -236,7 +267,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => setLang(lang === 'en' ? 'kn' : 'en')}
-              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-white/40 text-white"
+              className="px-2.5 min-h-[44px] text-xs font-semibold rounded-lg border border-white/40 text-white"
             >
               {lang === 'en' ? 'KN' : 'EN'}
             </button>
@@ -244,7 +275,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Open menu"
-              className="p-2 rounded-lg border border-white/40 text-white"
+              className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-lg border border-white/40 text-white"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -266,22 +297,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
       >
         <nav
           aria-label="Primary navigation"
-          className={`bg-[#0F1F5C] text-white h-[56px] flex items-center justify-between gap-4 transition-all ${
+          className={`bg-[#0F1F5C] text-white h-[56px] flex items-center justify-between transition-all ${
             scrolled
-              ? 'max-w-[1440px] mx-auto px-6 xl:px-10'
-              : 'max-w-[1344px] mx-auto px-5 xl:px-7 rounded-[10px] shadow-[0_14px_34px_-8px_rgba(15,31,92,0.48)]'
+              ? 'max-w-[1440px] mx-auto px-4 xl:px-10 gap-2 xl:gap-4'
+              : 'max-w-[1344px] mx-auto px-4 xl:px-7 gap-3 xl:gap-4 rounded-[10px] shadow-[0_14px_34px_-8px_rgba(15,31,92,0.48)]'
           }`}
         >
           {scrolled && (
-            <Link to="/" className="shrink-0 mr-2" aria-label="MY CONCRETE Home">
+            <Link to="/" className="shrink-0 mr-1 xl:mr-2" aria-label="MY CONCRETE Home">
               <BrandLogo onWhitePlate compact />
             </Link>
           )}
 
           <div
-            className={`flex items-center flex-1 ${
-              scrolled ? 'justify-center gap-3 xl:gap-5' : 'justify-between gap-3 xl:gap-6 2xl:gap-8'
-            } text-[13px] xl:text-[15px] 2xl:text-[16px] font-medium`}
+            className={`flex items-center flex-1 min-w-0 ${
+              scrolled
+                ? 'justify-between lg:gap-1.5 xl:gap-4 text-[12px] xl:text-[14px] 2xl:text-[15px]'
+                : 'justify-between lg:gap-2 xl:gap-5 2xl:gap-7 text-[13px] xl:text-[15px] 2xl:text-[16px]'
+            } font-medium`}
           >
             <Link
               to="/"
@@ -476,12 +509,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {t('contact')}
             </Link>
 
-            <Link
-              to="/quote"
-              className="inline-flex items-center justify-center rounded-full bg-[#D92B25] hover:bg-[#B9221D] text-white px-4 py-1.5 text-[14px] font-semibold shadow-sm hover:-translate-y-0.5 transition-all whitespace-nowrap shrink-0"
-            >
-              {t('getQuote')}
-            </Link>
+            <div className="flex items-center gap-1.5 xl:gap-2 shrink-0">
+              {scrolled && (
+                <button
+                  type="button"
+                  onClick={() => setSearchModalOpen(true)}
+                  aria-label="Search site"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 hover:border-[#FFC93C] px-2 xl:px-2.5 py-1.5 text-xs font-medium text-white hover:text-[#FFC93C] transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                >
+                  <Search className="w-3.5 h-3.5 text-[#FFC93C]" />
+                  <span className="hidden xl:inline">Search</span>
+                </button>
+              )}
+              <Link
+                to="/quote"
+                className="inline-flex items-center justify-center rounded-full bg-[#D92B25] hover:bg-[#B9221D] text-white px-3 xl:px-4 py-1.5 text-[12px] xl:text-[14px] font-semibold shadow-sm hover:-translate-y-0.5 transition-all whitespace-nowrap shrink-0"
+              >
+                {t('getQuote')}
+              </Link>
+            </div>
           </div>
         </nav>
       </div>
@@ -512,6 +558,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex-1 overflow-y-auto px-5 py-5 space-y-2 text-base">
+            <div className="pb-3">
+              <GlobalHeaderSearch
+                variant="drawer-inline"
+                onNavigateDone={() => setMobileMenuOpen(false)}
+              />
+            </div>
             <Link
               to="/"
               onClick={() => setMobileMenuOpen(false)}
@@ -694,21 +746,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <CallLink
                 phone={phoneDisplay}
                 whatsapp={whatsappDisplay}
-                className="flex items-center justify-center gap-2 rounded-lg border border-white/30 min-h-[44px] py-3 text-sm font-semibold text-white hover:border-[#FFC93C]"
+                className="justify-center gap-2 rounded-lg border border-white/30 px-3 py-2.5 text-sm font-semibold text-white hover:border-[#FFC93C]"
               >
-                <Phone className="w-4 h-4 text-[#FFC93C]" />
-                <span>Call Plant</span>
+                <Phone className="w-4 h-4 text-[#FFC93C] shrink-0" />
+                <span className="tabular-nums truncate">{phoneDisplay}</span>
               </CallLink>
               <a
                 href={whatsappHref}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-center gap-2 rounded-lg bg-[#16A34A] py-3 text-sm font-semibold text-white"
+                className="flex items-center justify-center gap-2 rounded-lg bg-[#16A34A] min-h-[44px] py-2.5 text-sm font-semibold text-white"
               >
                 <MessageCircle className="w-4 h-4" />
                 <span>WhatsApp</span>
               </a>
             </div>
+            <MailLink
+              email={emailDisplay}
+              className="w-full justify-center gap-2 rounded-lg border border-white/25 px-3 py-2 text-xs font-medium text-slate-200 hover:border-[#FFC93C] hover:text-[#FFC93C]"
+            >
+              <Mail className="w-4 h-4 text-[#FFC93C] shrink-0" />
+              <span>{emailDisplay}</span>
+            </MailLink>
           </div>
         </div>
       )}
@@ -828,24 +887,26 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <CallLink
                 phone={phoneDisplay}
                 whatsapp={whatsappDisplay}
-                className="hover:text-[#FFC93C] font-semibold inline-flex items-center min-h-[44px] md:min-h-0"
+                className="gap-1.5 hover:text-[#FFC93C] font-semibold"
               >
-                {phoneDisplay}
+                <Phone className="w-3.5 h-3.5 text-[#FFC93C] shrink-0" />
+                <span>{phoneDisplay}</span>
               </CallLink>
               <CopyPhoneButton
                 phone={phoneDisplay}
                 className="hidden md:inline-flex border-white/25 text-slate-200 hover:border-[#FFC93C] hover:text-white"
               />
             </div>
-            <p>
-              Email:{' '}
-              <EmailLink
+            <div className="flex flex-wrap items-center gap-2">
+              <span>Email:</span>
+              <MailLink
                 email={emailDisplay}
-                className="hover:text-[#FFC93C] inline-flex items-center min-h-[44px] md:min-h-0"
+                className="gap-1.5 hover:text-[#FFC93C]"
               >
-                {emailDisplay}
-              </EmailLink>
-            </p>
+                <Mail className="w-3.5 h-3.5 text-[#FFC93C] shrink-0" />
+                <span>{emailDisplay}</span>
+              </MailLink>
+            </div>
             <p className="text-emerald-300 font-medium">{biz?.workingHours}</p>
             <div className="pt-2 flex flex-wrap gap-3">
               <a
@@ -960,6 +1021,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
+
+      <GlobalSearchModal
+        open={searchModalOpen}
+        onClose={() => setSearchModalOpen(false)}
+      />
     </div>
   );
 }

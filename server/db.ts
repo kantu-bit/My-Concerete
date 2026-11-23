@@ -222,6 +222,12 @@ export function initSchema(): void {
       role_or_company TEXT NOT NULL,
       location TEXT NOT NULL,
       quote TEXT NOT NULL,
+      rating INTEGER NOT NULL DEFAULT 5,
+      project_title TEXT DEFAULT '',
+      segment TEXT DEFAULT 'Residential',
+      grade_used TEXT DEFAULT '',
+      volume_note TEXT DEFAULT '',
+      project_image_url TEXT DEFAULT '',
       published INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -347,6 +353,15 @@ export function initSchema(): void {
     ['must_change_password', `INTEGER NOT NULL DEFAULT 1`],
     ['two_factor_enabled', `INTEGER NOT NULL DEFAULT 0`],
     ['last_login_at', `TEXT DEFAULT ''`],
+  ]);
+
+  ensureColumns('testimonials', [
+    ['rating', `INTEGER NOT NULL DEFAULT 5`],
+    ['project_title', `TEXT DEFAULT ''`],
+    ['segment', `TEXT DEFAULT 'Residential'`],
+    ['grade_used', `TEXT DEFAULT ''`],
+    ['volume_note', `TEXT DEFAULT ''`],
+    ['project_image_url', `TEXT DEFAULT ''`],
   ]);
 
   // Backfill reference codes for legacy enquiries & newsletter subscribers if empty

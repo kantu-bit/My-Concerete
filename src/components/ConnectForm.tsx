@@ -3,6 +3,8 @@ import { CheckCircle2, AlertCircle, Loader2, Mail, MessageCircle } from 'lucide-
 import { useApp } from '../context/AppContext.tsx';
 import { readApiJson } from '../utils/api.ts';
 import { buildWhatsAppUrl } from '../utils/documents.ts';
+import { MailLink } from './ContactLinks.tsx';
+import { CONTACT_CONFIG } from '../config/contact.ts';
 
 interface ConnectFormProps {
   type?: 'contact' | 'partner' | 'careers';
@@ -33,7 +35,9 @@ export function ConnectForm({
   const [statusMsg, setStatusMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [submittedActions, setSubmittedActions] = useState<{
     whatsappUrl: string;
-    mailtoUrl: string;
+    email: string;
+    subject: string;
+    body: string;
   } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -84,14 +88,14 @@ export function ConnectForm({
         }),
       });
       const json = await readApiJson<{ ok: boolean; enquiryCode?: string; whatsappUrl?: string }>(res);
-      const ownerEmail = biz?.email || 'myconcretektl@gmail.com';
-      const ownerWhatsapp = biz?.whatsapp || biz?.phone || '+91 73378 07372';
+      const ownerEmail = biz?.email || CONTACT_CONFIG.email;
+      const ownerWhatsapp = biz?.whatsapp || biz?.phone || CONTACT_CONFIG.whatsappDisplay;
       const refId = json.enquiryCode || '';
       setSubmittedActions({
         whatsappUrl: json.whatsappUrl || buildWhatsAppUrl(ownerWhatsapp, summaryText),
-        mailtoUrl: `mailto:${ownerEmail}?subject=${encodeURIComponent(
-          `MY CONCRETE ${labelText} Enquiry ${refId} – ${name.trim()}`
-        )}&body=${encodeURIComponent(summaryText)}`,
+        email: ownerEmail,
+        subject: `MY CONCRETE ${labelText} Enquiry ${refId} – ${name.trim()}`,
+        body: summaryText,
       });
       setStatusMsg({
         kind: 'ok',
@@ -275,15 +279,15 @@ export function ConnectForm({
                 <MessageCircle className="w-3.5 h-3.5" />
                 <span>Send on WhatsApp</span>
               </a>
-              <a
-                href={submittedActions.mailtoUrl}
-                target="_top"
-                rel="noopener"
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#D92B25] hover:brightness-110 text-white px-3.5 py-1.5 text-xs font-semibold"
+              <MailLink
+                email={submittedActions.email}
+                subject={submittedActions.subject}
+                body={submittedActions.body}
+                className="justify-center gap-1.5 rounded-full bg-[#D92B25] hover:brightness-110 text-white px-3.5 py-1.5 text-xs font-semibold"
               >
                 <Mail className="w-3.5 h-3.5" />
                 <span>Send via Email</span>
-              </a>
+              </MailLink>
             </div>
           )}
         </div>

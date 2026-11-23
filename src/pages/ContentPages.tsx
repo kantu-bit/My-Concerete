@@ -6,7 +6,7 @@ import { useDocumentMeta } from '../utils/seo.ts';
 import { ConnectForm } from '../components/ConnectForm.tsx';
 import { VisualPlate } from '../components/VisualPlate.tsx';
 import { PlantMap } from '../components/PlantMap.tsx';
-import { CallLink, CopyPhoneButton, EmailLink } from '../components/ContactLinks.tsx';
+import { CallLink, CopyPhoneButton, MailLink } from '../components/ContactLinks.tsx';
 import { buildWhatsAppUrl } from '../utils/documents.ts';
 
 export function PartnerPage() {
@@ -58,36 +58,44 @@ export function PartnerPage() {
 }
 
 export function MediaPage() {
-  const { data } = useApp();
+  const { data, lang } = useApp();
   const [filter, setFilter] = useState('All');
   const media = data?.media || [];
-  const categories = ['All', ...Array.from(new Set(media.map((m) => m.category)))];
+  const preferredOrder = ['All', 'Plant', 'Transit Mixers', 'Cement Bricks', 'Project Sites', 'Brand'];
+  const dynamicCats = Array.from(new Set(media.map((m) => m.category)));
+  const categories = [
+    ...preferredOrder.filter((c) => c === 'All' || dynamicCats.includes(c)),
+    ...dynamicCats.filter((c) => !preferredOrder.includes(c)),
+  ];
   const visible = filter === 'All' ? media : media.filter((m) => m.category === filter);
 
   useDocumentMeta({
-    title: 'Media & Plant Gallery | MY CONCRETE Kotihal',
+    title: 'Plant & Project Gallery | MY CONCRETE Kotihal, Ranebennur & Davangere',
     description:
-      'View batching plant infrastructure, cement brick unit, transit mixers, and completed pours from MY CONCRETE Kotihal.',
+      'Real photos of MY CONCRETE twin storage silos, transit mixers, cement bricks yard, slab pours, and brand overview from Kotihal.',
   });
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-10">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold text-[#D92B25]">Plant &amp; Site Showcase</p>
+          <p className="text-xs font-semibold text-[#D92B25]">Real Kotihal Plant &amp; Site Showcase</p>
           <h1 className="font-display font-extrabold text-3xl sm:text-4xl text-[#0F1F5C] dark:text-white">
-            Media &amp; Plant Gallery
+            Plant &amp; Project Gallery
           </h1>
+          <p className="text-sm text-[var(--muted)] mt-1">
+            Genuine photography of our Kotihal batching silos, BharatBenz transit mixers, curing brick yard, and structural slab pours.
+          </p>
         </div>
 
         {media.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 bg-[var(--surface)] p-1 rounded-full border border-[#D7E4FF] dark:border-[#264096]">
+          <div className="flex flex-wrap gap-1.5 bg-[var(--surface)] p-1.5 rounded-full border border-[#D7E4FF] dark:border-[#264096]">
             {categories.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setFilter(cat)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors cursor-pointer ${
                   filter === cat
                     ? 'bg-[#D92B25] text-white'
                     : 'text-[var(--muted)] hover:bg-[var(--bg-soft)]'
@@ -114,28 +122,103 @@ export function MediaPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {visible.map((m) => (
-            <div key={m.id} className="warm-card overflow-hidden">
-              <div className="h-52">
-                <VisualPlate
-                  imageUrl={m.image_url}
-                  variant="media"
-                  title={m.title}
-                  subtitle={`${m.category} · ${m.published_date}`}
-                />
-              </div>
-              <div className="p-5 space-y-1.5">
-                <p className="text-xs text-[var(--muted)]">
-                  {m.category} · {m.published_date}
-                </p>
-                <h2 className="font-display font-bold text-lg text-[#0F1F5C] dark:text-white">{m.title}</h2>
-                <p className="text-sm text-[var(--muted)]">{m.caption}</p>
-              </div>
-            </div>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {visible.map((m) => {
+            const parts = m.caption.split('|').map((s) => s.trim()).filter(Boolean);
+            const primaryCaption = lang === 'kn' && parts[1] ? parts[1] : parts[0] || m.caption;
+            const secondaryCaption = lang === 'kn' && parts[1] ? parts[0] : parts[1];
+            const isSilos = m.image_url.includes('plant-silos');
+            const isSlab = m.image_url.includes('slab-rebar');
+            const isPoster = m.image_url.includes('brand-poster');
+            const isBricksTall = m.image_url.includes('brick-stacks');
+            const isPortrait = isSilos || isSlab || isPoster || isBricksTall;
+            const objectPos = isSilos
+              ? 'center 40%'
+              : isSlab
+              ? 'center 60%'
+              : isPoster
+              ? 'center top'
+              : 'center';
+
+            return (
+              <article key={m.id} className="group warm-card overflow-hidden flex flex-col">
+                <div className="h-64 overflow-hidden bg-[#0F1F5C]">
+                  <VisualPlate
+                    imageUrl={m.image_url}
+                    variant="media"
+                    title={m.title}
+                    alt={`${m.title} – ${m.category} photo by MY CONCRETE Kotihal`}
+                    width={isPortrait ? 960 : 1280}
+                    height={isPortrait ? 1280 : 720}
+                    objectPosition={objectPos}
+                    subtitle={`${m.category} · ${m.published_date}`}
+                    className="w-full h-full transition-transform duration-500 group-hover:scale-[1.04]"
+                  />
+                </div>
+                <div className="p-5 space-y-2 flex-1 flex flex-col justify-between">
+                  <div className="space-y-1.5">
+                    <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-[#D92B25]">
+                      {m.category}
+                    </span>
+                    <h2 className="font-display font-bold text-lg text-[#0F1F5C] dark:text-white leading-snug">
+                      {m.title}
+                    </h2>
+                    <p className="text-sm text-[var(--muted)] leading-relaxed">{primaryCaption}</p>
+                    {secondaryCaption && (
+                      <p className="text-xs text-[var(--muted)]/85 leading-relaxed pt-1 border-t border-[#EAF1FF] dark:border-[#264096]">
+                        {secondaryCaption}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
+
+      {/* Real Site Concrete Pour Video Showcase */}
+      <section className="warm-card p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="lg:col-span-5 flex justify-center">
+          <div className="w-full max-w-[300px] aspect-[9/16] rounded-[18px] overflow-hidden bg-[#0F1F5C] shadow-lg border border-[#D7E4FF] dark:border-[#264096]">
+            <video
+              controls
+              playsInline
+              preload="metadata"
+              poster="/images/home/mixer-plant-card.webp"
+              className="w-full h-full object-cover"
+            >
+              <source src="/assets/aistudio/VID-20260718-WA0008_47e83764.mp4" type="video/mp4" />
+              Your browser does not support video playback.
+            </video>
+          </div>
+        </div>
+        <div className="lg:col-span-7 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-[#D92B25]">
+            Live Site Pour Footage
+          </p>
+          <h2 className="font-display font-bold text-2xl text-[#0F1F5C] dark:text-white">
+            On-Site Road &amp; Slab Concrete Placement
+          </h2>
+          <p className="text-sm text-[var(--muted)] leading-relaxed">
+            Continuous ready-mix discharge from our Kotihal transit mixer crew directly into prepared road formwork across our Ranebennur &amp; Davangere delivery corridor.
+          </p>
+          <p className="text-xs text-[var(--muted)]">
+            ರಾಣೆಬೆನ್ನೂರು ಮತ್ತು ದಾವಣಗೆರೆ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ರಸ್ತೆ ಮತ್ತು ಸ್ಲ್ಯಾಬ್ ಕಾಮಗಾರಿಗೆ MY CONCRETE ಟ್ರಾನ್ಸಿಟ್ ಮಿಕ್ಸರ್‌ನಿಂದ ನೇರ ಕಾಂಕ್ರೀಟ್ ಪೂರೈಕೆ.
+          </p>
+          <div className="pt-2 flex flex-wrap gap-3">
+            <Link to="/book" className="btn-orange-pill px-5 py-2.5 text-xs">
+              Book Transit Mixer Slot
+            </Link>
+            <Link
+              to="/quote"
+              className="rounded-full border border-[#D7E4FF] dark:border-[#264096] px-5 py-2.5 text-xs font-semibold hover:border-[#D92B25]"
+            >
+              Request Custom Quote
+            </Link>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -398,9 +481,9 @@ export function ContactPage() {
                 </a>
               </div>
             </div>
-            <EmailLink
+            <MailLink
               email={biz?.email || 'myconcretektl@gmail.com'}
-              className="flex items-start gap-3 min-h-[44px] py-1 text-left group hover:text-[#1F3FA8] dark:hover:text-[#FFC93C] transition-colors"
+              className="flex items-start gap-3 py-1 text-left group hover:text-[#1F3FA8] dark:hover:text-[#FFC93C] transition-colors"
             >
               <Mail className="w-5 h-5 text-[#D92B25] shrink-0 mt-0.5" />
               <div>
@@ -411,7 +494,7 @@ export function ContactPage() {
                   {biz?.email || 'myconcretektl@gmail.com'}
                 </p>
               </div>
-            </EmailLink>
+            </MailLink>
             <div className="pt-2 border-t border-[#D7E4FF] dark:border-[#264096] flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
                 Working Hours: {biz?.workingHours}

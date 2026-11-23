@@ -140,6 +140,51 @@ Configure your secrets in `.env` (never commit `.env`), then verify live deliver
 - Open `/admin` → **Settings → Notifications** to change `NOTIFY_EMAIL`, `OWNER_WHATSAPP`, `OWNER_WHATSAPP_2`, `WHATSAPP_PROVIDER`, or pause/enable individual channels, and click **Send test notification** to verify live delivery.
 - Every booking, quote, visit, enquiry, and newsletter subscriber displays live **Email** and **WhatsApp** delivery status badges (`sent` / `failed` / `skipped`) with a **Resend notification** button and full log in **Quotes & Inbox → Notification Outbox Log**.
 
+### F. Automatic Notifications Using Supabase Only (`notify-lead` Edge Function + Database Webhooks)
+
+To receive automatic Email + WhatsApp alerts directly from Supabase whenever a new row is inserted into `bookings`, `quotes`, `enquiries`, or `site_visits`:
+
+1. **Install & link Supabase CLI** (Project ID: `pcurnfguwxncmmgbedmf`):
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref pcurnfguwxncmmgbedmf
+   ```
+
+2. **Set Supabase Edge Function secrets** (never put real keys in code):
+   ```bash
+   npx supabase secrets set \
+     RESEND_API_KEY="re_your_resend_api_key" \
+     NOTIFY_EMAIL="myconcretektl@gmail.com" \
+     WHATSAPP_PROVIDER="callmebot" \
+     CALLMEBOT_PHONE="917337807372" \
+     CALLMEBOT_APIKEY="your_callmebot_apikey"
+   ```
+   *(Optional)* Add `RESEND_FROM="MY CONCRETE Dispatch <notifications@yourdomain.com>"`, `OWNER_WHATSAPP_2`, `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_ID` / `WHATSAPP_TEMPLATE_NAME` (for `WHATSAPP_PROVIDER=cloudapi`), or `TWILIO_SID` / `TWILIO_TOKEN` / `TWILIO_FROM` (for `WHATSAPP_PROVIDER=twilio`). Setting `WHATSAPP_PROVIDER=none` skips WhatsApp while keeping email active.
+
+3. **Deploy the Edge Function**:
+   ```bash
+   npx supabase functions deploy notify-lead --project-ref pcurnfguwxncmmgbedmf --no-verify-jwt
+   ```
+
+4. **Add the status columns & Database Webhooks (`AFTER INSERT`)**:
+   - **Option A (SQL Editor — fastest)**: Open **Supabase Dashboard → SQL Editor**, paste the entire contents of `supabase/webhooks.sql`, and click **Run**. This adds `notify_email_status`, `notify_whatsapp_status`, and `notified_at` to `bookings`, `quotes`, `enquiries`, and `site_visits`, enables `pg_net`, and creates `AFTER INSERT` triggers for all four tables.
+   - **Option B (Dashboard Webhooks UI)**: First run the `ALTER TABLE` statements from `supabase/schema.sql` / `supabase/webhooks.sql`, then go to **Supabase Dashboard → Database → Webhooks → Create a new hook** and create one `INSERT` webhook per table (`bookings`, `quotes`, `enquiries`, `site_visits`) pointing to:
+     - **Type**: `Supabase Edge Functions` → select `notify-lead` (Method `POST`, HTTP header `Content-Type: application/json`)
+     - **Events**: `Insert`
+
+5. **Test with a sample booking insert**:
+   ```sql
+   insert into public.bookings (
+     booking_code, product_slug, product_name, grade, quantity_m3, unit_type,
+     usage_type, slump_mm, pump_type, delivery_date, slot_id, slot_label,
+     site_address, city, estimated_total, customer_name, phone, status
+   ) values (
+     'MC-2026-TEST01', 'rmc', 'Ready-Mix Concrete', 'M25', 8, 'm3',
+     'Roof Slab', '100-125 mm', 'line', '2026-11-25', 'morning', '08:00 AM - 10:00 AM',
+     'Kotihal Road Test Site', 'Ranebennur', 48500, 'Test Builder', '7337807372', 'confirmed'
+   );
+   ```
+
 ---
 
 ## 5. Development & Production Commands

@@ -11,13 +11,13 @@ export function isPlaceholderValue(val: string): boolean {
   return !val || val.includes('[') || val.includes(']');
 }
 
-export function buildWhatsAppUrl(phoneOrWhatsapp: string, message: string): string {
+export function buildWhatsAppUrl(phoneOrWhatsapp: string, message?: string): string {
   const clean = cleanPhoneDigits(phoneOrWhatsapp || '917337807372');
-  const encoded = encodeURIComponent(message);
-  if (!clean || clean.length < 10) {
-    return `https://wa.me/917337807372?text=${encoded}`;
+  const target = !clean || clean.length < 10 ? '917337807372' : clean;
+  if (!message) {
+    return `https://wa.me/${target}`;
   }
-  return `https://wa.me/${clean}?text=${encoded}`;
+  return `https://wa.me/${target}?text=${encodeURIComponent(message)}`;
 }
 
 export function downloadBookingPdf(booking: BookingRecord, biz: BusinessConfig): void {

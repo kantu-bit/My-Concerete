@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -38,6 +38,19 @@ interface BookingDraft {
   notes: string;
 }
 
+interface SavedCustomerRecord {
+  id: string;
+  customerName: string;
+  phone: string;
+  email: string;
+  gstNumber: string;
+  siteAddress: string;
+  landmark: string;
+  city: string;
+  siteLat: number;
+  siteLng: number;
+}
+
 interface EstimateResponse {
   unitType?: string;
   dispatchPlantId?: string;
@@ -53,6 +66,18 @@ interface EstimateResponse {
 }
 
 const DRAFT_KEY = 'mc_booking_draft_v2';
+const SAVED_CUSTOMERS_KEY = 'mc_saved_customers_v1';
+
+function loadSavedCustomers(): SavedCustomerRecord[] {
+  try {
+    const raw = localStorage.getItem(SAVED_CUSTOMERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 function getNextOpenDate(closedDays: number[], holidays: string[]): string {
   const d = new Date();
@@ -132,7 +157,11 @@ export function BookDeliveryPage() {
   const [websiteUrl, setWebsiteUrl] = useState(''); // honeypot
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [addressError, setAddressError] = useState<string | null>(null);
   const [waitlistPrompt, setWaitlistPrompt] = useState(false);
+  const [savedCustomers, setSavedCustomers] = useState<SavedCustomerRecord[]>(() => loadSavedCustomers());
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const siteAddressRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [availability, setAvailability] = useState<{
     valid: boolean;
@@ -147,10 +176,27 @@ export function BookDeliveryPage() {
     const saved = localStorage.getItem(DRAFT_KEY);
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as BookingDraft;
+        const parsed = JSON.parse(saved) as Partial<BookingDraft>;
         return {
-          ...parsed,
+          productSlug: parsed.productSlug || 'standard-grades',
+          grade: parsed.grade || 'M25',
+          quantityM3: Number(parsed.quantityM3) > 0 ? Number(parsed.quantityM3) : 6,
+          usageType: parsed.usageType || 'Roof Slab',
+          slumpMm: parsed.slumpMm || '120–140 mm',
+          pumpType: parsed.pumpType === 'line' || parsed.pumpType === 'boom' ? parsed.pumpType : 'none',
+          deliveryDate: typeof parsed.deliveryDate === 'string' ? parsed.deliveryDate : '',
+          slotId: parsed.slotId || 'slot-08-10',
           dispatchPlantId: parsed.dispatchPlantId || 'kotihal',
+          siteAddress: typeof parsed.siteAddress === 'string' ? parsed.siteAddress : '',
+          landmark: typeof parsed.landmark === 'string' ? parsed.landmark : '',
+          city: typeof parsed.city === 'string' && parsed.city ? parsed.city : 'Ranebennur',
+          siteLat: Number.isFinite(Number(parsed.siteLat)) ? Number(parsed.siteLat) : 14.6197,
+          siteLng: Number.isFinite(Number(parsed.siteLng)) ? Number(parsed.siteLng) : 75.6295,
+          customerName: typeof parsed.customerName === 'string' ? parsed.customerName : '',
+          phone: typeof parsed.phone === 'string' ? parsed.phone : '',
+          email: typeof parsed.email === 'string' ? parsed.email : '',
+          gstNumber: typeof parsed.gstNumber === 'string' ? parsed.gstNumber : '',
+          notes: typeof parsed.notes === 'string' ? parsed.notes : '',
         };
       } catch {
         // ignore invalid draft
@@ -185,15 +231,70 @@ export function BookDeliveryPage() {
       'Schedule 24/7 Ready-Mix Concrete or Cement Bricks delivery from Kotihal or Davangere across Ranebennur & Davangere with 2-hour day/night windows.',
   });
 
-  // Apply URL query parameters from Volume/Brick Calculator, Plant Map, or Product pages
+  // Apply URL query parameters from Volume/Brick Calculator, Delivery Status, Plant Map, Admin Customers, or Product pages
   useEffect(() => {
     const qQty = Number(searchParams.get('qty'));
     const qProduct = searchParams.get('product');
     const qGrade = searchParams.get('grade');
     const qUsage = searchParams.get('usage');
     const qPlant = searchParams.get('plant');
+    const qDate = searchParams.get('date');
+    const qSlot = searchParams.get('slot');
+    const qName = searchParams.get('customerName');
+    const qPhone = searchParams.get('phone');
+    const qEmail = searchParams.get('email');
+    const qAddress = searchParams.get('address');
+    const qCity = searchParams.get('city');
+    const qLandmark = searchParams.get('landmark');
+    const qGst = searchParams.get('gst');
+    const qLat = Number(searchParams.get('lat'));
+    const qLng = Number(searchParams.get('lng'));
 
-    if (!qQty && !qProduct && !qGrade && !qUsage && !qPlant) return;
+    if (
+      !qQty &&
+      !qProduct &&
+      !qGrade &&
+      !qUsage &&
+      !qPlant &&
+      !qDate &&
+      !qSlot &&
+      !qName &&
+      !qPhone &&
+      !qEmail &&
+      !qAddress &&
+      !qCity &&
+      !qLandmark &&
+      !qGst &&
+      !Number.isFinite(qLat) &&
+      !Number.isFinite(qLng)
+    ) {
+      return;
+    }
+
+    if (qName && qPhone) {
+      const custRecord: SavedCustomerRecord = {
+        id: qPhone,
+        customerName: qName,
+        phone: qPhone,
+        email: qEmail || '',
+        gstNumber: qGst || '',
+        siteAddress: qAddress || '',
+        landmark: qLandmark || '',
+        city: qCity || 'Ranebennur',
+        siteLat: 14.6197,
+        siteLng: 75.6295,
+      };
+      setSavedCustomers((prev) => {
+        const nextList = [custRecord, ...prev.filter((c) => c.id !== custRecord.id)].slice(0, 20);
+        try {
+          localStorage.setItem(SAVED_CUSTOMERS_KEY, JSON.stringify(nextList));
+        } catch {
+          // ignore storage quota errors
+        }
+        return nextList;
+      });
+      setSelectedCustomerId(custRecord.id);
+    }
 
     setDraft((prev) => {
       const next = { ...prev };
@@ -202,12 +303,26 @@ export function BookDeliveryPage() {
       if (qGrade) next.grade = qGrade;
       if (qUsage) next.usageType = qUsage;
       if (qPlant) next.dispatchPlantId = qPlant;
+      if (qDate && /^\d{4}-\d{2}-\d{2}$/.test(qDate)) next.deliveryDate = qDate;
+      if (qSlot) next.slotId = qSlot;
+      if (qName) next.customerName = qName;
+      if (qPhone) next.phone = qPhone.replace(/\D/g, '').slice(0, 10);
+      if (qEmail) next.email = qEmail;
+      if (qAddress) next.siteAddress = qAddress;
+      if (qCity) next.city = qCity;
+      if (qLandmark) next.landmark = qLandmark;
+      if (qGst) next.gstNumber = qGst;
+      if (Number.isFinite(qLat) && qLat !== 0) next.siteLat = qLat;
+      if (Number.isFinite(qLng) && qLng !== 0) next.siteLng = qLng;
       if (qProduct === 'cement-bricks') {
         next.pumpType = 'none';
         next.slumpMm = 'Per Piece';
       }
       return next;
     });
+    if (qAddress && qAddress.trim().length >= 2) {
+      setAddressError(null);
+    }
   }, [searchParams]);
 
   // Initialize default open date & valid slot once scheduling config loads (and reset stale past draft dates)
@@ -311,44 +426,85 @@ export function BookDeliveryPage() {
     isPieces,
   ]);
 
-  function validateStep(current: number): string | null {
+  function handleSelectCustomer(customerId: string) {
+    setSelectedCustomerId(customerId);
+    if (!customerId) return;
+    const customer = savedCustomers.find((c) => c.id === customerId);
+    if (!customer) return;
+    setDraft((prev) => ({
+      ...prev,
+      customerName: customer.customerName || prev.customerName,
+      phone: customer.phone || prev.phone,
+      email: customer.email || prev.email,
+      gstNumber: customer.gstNumber || prev.gstNumber,
+      siteAddress: customer.siteAddress || prev.siteAddress,
+      landmark: customer.landmark || prev.landmark,
+      city: customer.city || prev.city,
+      siteLat: Number.isFinite(customer.siteLat) && customer.siteLat !== 0 ? customer.siteLat : prev.siteLat,
+      siteLng: Number.isFinite(customer.siteLng) && customer.siteLng !== 0 ? customer.siteLng : prev.siteLng,
+    }));
+    if ((customer.siteAddress || '').trim().length >= 2) {
+      setAddressError(null);
+    }
+    setSubmitError(null);
+  }
+
+  function validateStep(current: number): { error: string | null; field?: 'siteAddress' } {
     if (current === 1) {
-      if (!draft.productSlug || !draft.grade) return 'Please select a product and grade/size.';
+      if (!draft.productSlug || !draft.grade) return { error: 'Please select a product and grade/size.' };
     }
     if (current === 2) {
       if (isPieces) {
         if (draft.quantityM3 < 1 || draft.quantityM3 > 200000) {
-          return 'Please enter a valid number of bricks/blocks (1 to 200,000 pieces).';
+          return { error: 'Please enter a valid number of bricks/blocks (1 to 200,000 pieces).' };
         }
       } else if (draft.quantityM3 < 1 || draft.quantityM3 > 250) {
-        return 'Please enter a concrete quantity between 1 and 250 m³.';
+        return { error: 'Please enter a concrete quantity between 1 and 250 m³.' };
       }
     }
     if (current === 3) {
-      if (!draft.deliveryDate) return 'Please select a delivery date.';
+      if (!draft.deliveryDate) return { error: 'Please select a delivery date.' };
       if (availability && !availability.valid) {
-        return `Selected date is unavailable (${availability.reason}). Please choose another date.`;
+        return { error: `Selected date is unavailable (${availability.reason}). Please choose another date.` };
       }
-      if (!draft.slotId) return 'Please choose a 2-hour delivery window.';
+      if (!draft.slotId) return { error: 'Please choose a 2-hour delivery window.' };
     }
     if (current === 4) {
-      if (draft.siteAddress.trim().length < 5) return 'Please enter your delivery site address.';
-      if (draft.city.trim().length < 2) return 'Please enter your city or town.';
-    }
-    if (current === 5) {
-      if (draft.customerName.trim().length < 2) return 'Please enter your full name.';
-      if (!/^[6-9]\d{9}$/.test(draft.phone.trim())) {
-        return 'Please enter a valid 10-digit Indian mobile number starting with 6–9.';
+      const trimmedAddress = (draft.siteAddress ?? '').trim();
+      if (trimmedAddress.length < 2) {
+        return { error: 'Please enter your delivery site address.', field: 'siteAddress' };
+      }
+      if ((draft.city ?? '').trim().length < 2) {
+        return { error: 'Please enter your city or town.' };
       }
     }
-    return null;
+    if (current === 5) {
+      if ((draft.customerName ?? '').trim().length < 2) return { error: 'Please enter your full name.' };
+      if (!/^[6-9]\d{9}$/.test((draft.phone ?? '').trim())) {
+        return { error: 'Please enter a valid 10-digit Indian mobile number starting with 6–9.' };
+      }
+    }
+    return { error: null };
   }
 
   function nextStep() {
     setSubmitError(null);
-    const err = validateStep(step);
-    if (err) {
-      setSubmitError(err);
+    setAddressError(null);
+    if (step === 4) {
+      console.log('[BookDelivery] Step 4 form values:', {
+        ...draft,
+        dispatchPlantId: activePlantId,
+        selectedCustomerId,
+      });
+    }
+    const check = validateStep(step);
+    if (check.error) {
+      if (check.field === 'siteAddress') {
+        setAddressError(check.error);
+        siteAddressRef.current?.focus();
+      } else {
+        setSubmitError(check.error);
+      }
       return;
     }
     setStep((s) => Math.min(6, s + 1));
@@ -356,12 +512,35 @@ export function BookDeliveryPage() {
 
   async function submitBooking(allowWaitlist = false) {
     setSubmitError(null);
+    setAddressError(null);
     setWaitlistPrompt(false);
+
+    const payloadToSubmit = {
+      ...draft,
+      siteAddress: (draft.siteAddress ?? '').trim(),
+      city: (draft.city ?? '').trim(),
+      customerName: (draft.customerName ?? '').trim(),
+      phone: (draft.phone ?? '').trim(),
+      dispatchPlantId: activePlantId,
+      pumpType: isPieces ? 'none' : draft.pumpType,
+      slumpMm: isPieces ? 'Per Piece' : draft.slumpMm,
+      language: lang,
+      allowWaitlist,
+      website_url: websiteUrl,
+    };
+
+    console.log('[BookDelivery] Submitting booking form values:', payloadToSubmit);
+
     for (let s = 1; s <= 5; s += 1) {
-      const err = validateStep(s);
-      if (err) {
+      const check = validateStep(s);
+      if (check.error) {
         setStep(s);
-        setSubmitError(err);
+        if (check.field === 'siteAddress') {
+          setAddressError(check.error);
+          setTimeout(() => siteAddressRef.current?.focus(), 0);
+        } else {
+          setSubmitError(check.error);
+        }
         return;
       }
     }
@@ -371,15 +550,7 @@ export function BookDeliveryPage() {
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...draft,
-          dispatchPlantId: activePlantId,
-          pumpType: isPieces ? 'none' : draft.pumpType,
-          slumpMm: isPieces ? 'Per Piece' : draft.slumpMm,
-          language: lang,
-          allowWaitlist,
-          website_url: websiteUrl,
-        }),
+        body: JSON.stringify(payloadToSubmit),
       });
       const { data: json, isJson } = await parseJsonResponse<{
         booking?: { booking_code: string };
@@ -395,6 +566,30 @@ export function BookDeliveryPage() {
           setWaitlistPrompt(true);
         }
         throw new Error(json.error || FRIENDLY_API_ERROR);
+      }
+
+      // Save customer profile for future quick-select auto-fill (address remains editable)
+      const savedEntry: SavedCustomerRecord = {
+        id: payloadToSubmit.phone,
+        customerName: payloadToSubmit.customerName,
+        phone: payloadToSubmit.phone,
+        email: draft.email.trim(),
+        gstNumber: draft.gstNumber.trim(),
+        siteAddress: payloadToSubmit.siteAddress,
+        landmark: draft.landmark.trim(),
+        city: payloadToSubmit.city,
+        siteLat: draft.siteLat,
+        siteLng: draft.siteLng,
+      };
+      const updatedCustomers = [
+        savedEntry,
+        ...savedCustomers.filter((c) => c.id !== savedEntry.id),
+      ].slice(0, 20);
+      setSavedCustomers(updatedCustomers);
+      try {
+        localStorage.setItem(SAVED_CUSTOMERS_KEY, JSON.stringify(updatedCustomers));
+      } catch {
+        // ignore storage quota errors
       }
 
       localStorage.removeItem(DRAFT_KEY);
@@ -485,7 +680,10 @@ export function BookDeliveryPage() {
                 </label>
                 <select
                   value={draft.productSlug}
-                  onChange={(e) => setDraft({ ...draft, productSlug: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDraft((prev) => ({ ...prev, productSlug: val }));
+                  }}
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                 >
                   {products.map((p) => (
@@ -502,7 +700,10 @@ export function BookDeliveryPage() {
                 </label>
                 <select
                   value={draft.grade}
-                  onChange={(e) => setDraft({ ...draft, grade: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDraft((prev) => ({ ...prev, grade: val }));
+                  }}
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                 >
                   {(selectedProduct?.grades || []).map((g) => (
@@ -531,7 +732,7 @@ export function BookDeliveryPage() {
                       <button
                         key={loc.id}
                         type="button"
-                        onClick={() => setDraft({ ...draft, dispatchPlantId: loc.id })}
+                        onClick={() => setDraft((prev) => ({ ...prev, dispatchPlantId: loc.id }))}
                         className={`text-left rounded-xl border p-3.5 transition-colors flex items-start gap-2.5 cursor-pointer ${
                           isSelected
                             ? 'border-[#D92B25] bg-[#FFF0EF] dark:bg-[#1F3FA8]'
@@ -577,7 +778,10 @@ export function BookDeliveryPage() {
                   max={isPieces ? '200000' : '250'}
                   step={isPieces ? '50' : '0.5'}
                   value={draft.quantityM3}
-                  onChange={(e) => setDraft({ ...draft, quantityM3: Number(e.target.value) })}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setDraft((prev) => ({ ...prev, quantityM3: val }));
+                  }}
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm tabular-nums"
                 />
               </div>
@@ -588,7 +792,10 @@ export function BookDeliveryPage() {
                 </label>
                 <select
                   value={draft.usageType}
-                  onChange={(e) => setDraft({ ...draft, usageType: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDraft((prev) => ({ ...prev, usageType: val }));
+                  }}
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                 >
                   {isPieces ? (
@@ -618,7 +825,10 @@ export function BookDeliveryPage() {
                   </label>
                   <select
                     value={draft.slumpMm}
-                    onChange={(e) => setDraft({ ...draft, slumpMm: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDraft((prev) => ({ ...prev, slumpMm: val }));
+                    }}
                     className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                   >
                     <option value="75–100 mm">75–100 mm (Chute / PCC)</option>
@@ -651,7 +861,7 @@ export function BookDeliveryPage() {
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => setDraft({ ...draft, pumpType: opt.id })}
+                      onClick={() => setDraft((prev) => ({ ...prev, pumpType: opt.id }))}
                       className={`text-left rounded-xl border p-4 transition-colors ${
                         draft.pumpType === opt.id
                           ? 'border-[#D92B25] bg-[#FFF0EF] dark:bg-[#1F3FA8]'
@@ -683,7 +893,10 @@ export function BookDeliveryPage() {
                     type="date"
                     min={todayIso}
                     value={draft.deliveryDate}
-                    onChange={(e) => setDraft({ ...draft, deliveryDate: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setDraft((prev) => ({ ...prev, deliveryDate: val }));
+                    }}
                     className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] pl-10 pr-3.5 py-2.5 text-sm tabular-nums"
                   />
                 </div>
@@ -714,7 +927,7 @@ export function BookDeliveryPage() {
                         <button
                           key={slot.id}
                           type="button"
-                          onClick={() => setDraft({ ...draft, slotId: slot.id })}
+                          onClick={() => setDraft((prev) => ({ ...prev, slotId: slot.id }))}
                           className={`text-left rounded-xl border p-3 transition-colors flex items-center justify-between gap-2 ${
                             draft.slotId === slot.id
                               ? 'border-[#D92B25] bg-[#FFF0EF] dark:bg-[#1F3FA8]'
@@ -763,7 +976,7 @@ export function BookDeliveryPage() {
                         <button
                           key={loc.id}
                           type="button"
-                          onClick={() => setDraft({ ...draft, dispatchPlantId: loc.id })}
+                          onClick={() => setDraft((prev) => ({ ...prev, dispatchPlantId: loc.id }))}
                           className={`px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors cursor-pointer ${
                             activePlantId === loc.id
                               ? 'border-[#D92B25] bg-[#FFF0EF] dark:bg-[#1F3FA8] text-[#0F1F5C] dark:text-white'
@@ -777,6 +990,30 @@ export function BookDeliveryPage() {
                   </div>
                 )}
 
+                {savedCustomers.length > 0 && (
+                  <div>
+                    <label
+                      htmlFor="saved-customer-select"
+                      className="block text-xs font-medium text-[var(--muted)] mb-1.5"
+                    >
+                      Select Saved Customer (Auto-fills Address)
+                    </label>
+                    <select
+                      id="saved-customer-select"
+                      value={selectedCustomerId}
+                      onChange={(e) => handleSelectCustomer(e.target.value)}
+                      className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2 text-sm"
+                    >
+                      <option value="">-- Enter new customer / address manually --</option>
+                      {savedCustomers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.customerName} ({c.phone}) — {c.siteAddress || c.city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">
                     Quick Town Preset
@@ -787,12 +1024,12 @@ export function BookDeliveryPage() {
                         key={town.name}
                         type="button"
                         onClick={() =>
-                          setDraft({
-                            ...draft,
+                          setDraft((prev) => ({
+                            ...prev,
                             city: town.name,
                             siteLat: town.lat,
                             siteLng: town.lng,
-                          })
+                          }))
                         }
                         className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
                           draft.city === town.name
@@ -807,16 +1044,43 @@ export function BookDeliveryPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">
-                    Site Address / Plot / Survey No. *
+                  <label
+                    htmlFor="delivery-site-address"
+                    className="block text-xs font-medium text-[var(--muted)] mb-1.5"
+                  >
+                    Delivery Site Address / Plot / Survey No. *
                   </label>
                   <textarea
+                    id="delivery-site-address"
+                    name="siteAddress"
+                    ref={siteAddressRef}
                     rows={2}
-                    value={draft.siteAddress}
-                    onChange={(e) => setDraft({ ...draft, siteAddress: e.target.value })}
+                    value={draft.siteAddress ?? ''}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setDraft((prev) => ({ ...prev, siteAddress: nextValue }));
+                      if (addressError) setAddressError(null);
+                      if (submitError) setSubmitError(null);
+                    }}
                     placeholder="Street, layout, ward, or survey number"
-                    className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2 text-sm"
+                    aria-invalid={Boolean(addressError)}
+                    aria-describedby={addressError ? 'delivery-site-address-error' : undefined}
+                    className={`w-full rounded-xl border bg-[var(--bg)] px-3.5 py-2 text-sm transition-colors ${
+                      addressError
+                        ? 'border-[#D92B25] focus:outline-none focus:ring-2 focus:ring-[#D92B25]/30'
+                        : 'border-[#D7E4FF] dark:border-[#264096]'
+                    }`}
                   />
+                  {addressError && (
+                    <p
+                      id="delivery-site-address-error"
+                      role="alert"
+                      className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-[#D92B25]"
+                    >
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{addressError}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -826,8 +1090,12 @@ export function BookDeliveryPage() {
                     </label>
                     <input
                       type="text"
-                      value={draft.city}
-                      onChange={(e) => setDraft({ ...draft, city: e.target.value })}
+                      value={draft.city ?? ''}
+                      onChange={(e) => {
+                        const nextCity = e.target.value;
+                        setDraft((prev) => ({ ...prev, city: nextCity }));
+                        if (submitError) setSubmitError(null);
+                      }}
                       className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 text-sm"
                     />
                   </div>
@@ -837,8 +1105,11 @@ export function BookDeliveryPage() {
                     </label>
                     <input
                       type="text"
-                      value={draft.landmark}
-                      onChange={(e) => setDraft({ ...draft, landmark: e.target.value })}
+                      value={draft.landmark ?? ''}
+                      onChange={(e) => {
+                        const nextLandmark = e.target.value;
+                        setDraft((prev) => ({ ...prev, landmark: nextLandmark }));
+                      }}
                       placeholder="Near temple / school"
                       className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3 py-2 text-sm"
                     />
@@ -897,13 +1168,39 @@ export function BookDeliveryPage() {
         {step === 5 && (
           <div className="space-y-5">
             <h2 className="font-display font-bold text-xl">5. Customer &amp; Site Contact</h2>
+            {savedCustomers.length > 0 && (
+              <div>
+                <label
+                  htmlFor="saved-customer-select-step5"
+                  className="block text-xs font-medium text-[var(--muted)] mb-1.5"
+                >
+                  Select Saved Customer (Auto-fills Contact &amp; Site Address)
+                </label>
+                <select
+                  id="saved-customer-select-step5"
+                  value={selectedCustomerId}
+                  onChange={(e) => handleSelectCustomer(e.target.value)}
+                  className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
+                >
+                  <option value="">-- Enter new customer manually --</option>
+                  {savedCustomers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.customerName} ({c.phone}) — {c.siteAddress || c.city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Full Name *</label>
                 <input
                   type="text"
-                  value={draft.customerName}
-                  onChange={(e) => setDraft({ ...draft, customerName: e.target.value })}
+                  value={draft.customerName ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDraft((prev) => ({ ...prev, customerName: val }));
+                  }}
                   placeholder="Site owner / engineer name"
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                 />
@@ -916,10 +1213,11 @@ export function BookDeliveryPage() {
                 <input
                   type="tel"
                   maxLength={10}
-                  value={draft.phone}
-                  onChange={(e) =>
-                    setDraft({ ...draft, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })
-                  }
+                  value={draft.phone ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setDraft((prev) => ({ ...prev, phone: val }));
+                  }}
                   placeholder="9XXXXXXXXX"
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm tabular-nums"
                 />
@@ -931,8 +1229,11 @@ export function BookDeliveryPage() {
                 </label>
                 <input
                   type="email"
-                  value={draft.email}
-                  onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+                  value={draft.email ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDraft((prev) => ({ ...prev, email: val }));
+                  }}
                   placeholder="you@example.com"
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                 />
@@ -944,8 +1245,11 @@ export function BookDeliveryPage() {
                 </label>
                 <input
                   type="text"
-                  value={draft.gstNumber}
-                  onChange={(e) => setDraft({ ...draft, gstNumber: e.target.value.toUpperCase() })}
+                  value={draft.gstNumber ?? ''}
+                  onChange={(e) => {
+                    const val = e.target.value.toUpperCase();
+                    setDraft((prev) => ({ ...prev, gstNumber: val }));
+                  }}
                   placeholder="29XXXXX..."
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm uppercase"
                 />
@@ -958,8 +1262,11 @@ export function BookDeliveryPage() {
               </label>
               <textarea
                 rows={3}
-                value={draft.notes}
-                onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+                value={draft.notes ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDraft((prev) => ({ ...prev, notes: val }));
+                }}
                 className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2 text-sm"
               />
             </div>
@@ -1060,6 +1367,7 @@ export function BookDeliveryPage() {
             disabled={step === 1}
             onClick={() => {
               setSubmitError(null);
+              setAddressError(null);
               setStep((s) => Math.max(1, s - 1));
             }}
             className="inline-flex items-center gap-1.5 rounded-full border border-[#D7E4FF] dark:border-[#264096] px-5 py-2.5 text-sm font-semibold disabled:opacity-40"

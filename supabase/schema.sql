@@ -34,6 +34,9 @@ create table if not exists public.bookings (
   gst_number text default '',
   notes text default '',
   status text not null default 'confirmed',
+  notify_email_status text not null default 'pending',
+  notify_whatsapp_status text not null default 'pending',
+  notified_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -55,6 +58,9 @@ create table if not exists public.site_visits (
   email text default '',
   notes text default '',
   status text not null default 'scheduled',
+  notify_email_status text not null default 'pending',
+  notify_whatsapp_status text not null default 'pending',
+  notified_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -72,6 +78,9 @@ create table if not exists public.quotes (
   notes text default '',
   attachment_name text default '',
   status text not null default 'new',
+  notify_email_status text not null default 'pending',
+  notify_whatsapp_status text not null default 'pending',
+  notified_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -86,8 +95,31 @@ create table if not exists public.enquiries (
   message text not null,
   consent boolean not null default true,
   status text not null default 'new',
+  notify_email_status text not null default 'pending',
+  notify_whatsapp_status text not null default 'pending',
+  notified_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.bookings
+  add column if not exists notify_email_status text not null default 'pending',
+  add column if not exists notify_whatsapp_status text not null default 'pending',
+  add column if not exists notified_at timestamptz;
+
+alter table public.site_visits
+  add column if not exists notify_email_status text not null default 'pending',
+  add column if not exists notify_whatsapp_status text not null default 'pending',
+  add column if not exists notified_at timestamptz;
+
+alter table public.quotes
+  add column if not exists notify_email_status text not null default 'pending',
+  add column if not exists notify_whatsapp_status text not null default 'pending',
+  add column if not exists notified_at timestamptz;
+
+alter table public.enquiries
+  add column if not exists notify_email_status text not null default 'pending',
+  add column if not exists notify_whatsapp_status text not null default 'pending',
+  add column if not exists notified_at timestamptz;
 
 -- Required PostgreSQL table & sequence grants for Supabase publishable/anon key inserts
 grant usage on schema public to anon, authenticated;

@@ -50,12 +50,15 @@ import {
   fetchEnquiriesFromSupabase,
   fetchQuotesFromSupabase,
   fetchSiteVisitsFromSupabase,
+  invokeSupabaseNotifyLead,
+  isSupabaseConfigured,
   syncBookingToSupabase,
   syncBookingUpdateToSupabase,
   syncEnquiryToSupabase,
   syncQuoteToSupabase,
   syncSiteVisitToSupabase,
   syncSiteVisitUpdateToSupabase,
+  type SupabaseLeadTable,
 } from './server/supabase.ts';
 
 try {
@@ -284,6 +287,185 @@ app.get(
   })
 );
 
+function getIstNowParts() {
+  const now = new Date();
+  const dateFmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const timeFmt = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const todayIst = dateFmt.format(now);
+  const tomorrowIst = dateFmt.format(new Date(now.getTime() + 24 * 60 * 60 * 1000));
+  const [hourStr, minStr] = timeFmt.format(now).split(':');
+  const currentHour = Number(hourStr) % 24;
+  const currentMinute = Number(minStr) % 60;
+  return {
+    todayIst,
+    tomorrowIst,
+    currentHour,
+    currentMinute,
+    istTimeLabel: `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')} IST`,
+    updatedAtIso: now.toISOString(),
+  };
+}
+
+function parseSlotHourRange(slotId: string): { startHour: number; endHour: number } {
+  const m = String(slotId).match(/slot-(\d{2})-(\d{2})/);
+  if (!m) return { startHour: 0, endHour: 24 };
+  return { startHour: Number(m[1]), endHour: Number(m[2]) };
+}
+
+function formatSlotShortTime(label: string): string {
+  return String(label || '')
+    .replace(/\s*\((Night|Early)\)\s*/gi, '')
+    .trim();
+}
+
+app.get(
+  '/api/delivery-status',
+  asyncRoute((_req, res) => {
+    const ist = getIstNowParts();
+    const plantLocations = getSetting('plantLocations', DEFAULT_PLANT_LOCATIONS);
+    const todayStatus = getSlotStatusForDate(ist.todayIst);
+    const tomorrowStatus = getSlotStatusForDate(ist.tomorrowIst);
+
+    const enrichedToday = todayStatus.slots.map((s) => {
+      const range = parseSlotHourRange(s.id);
+      const isCurrent = range.startHour <= ist.currentHour && ist.currentHour < range.endHour;
+      const isPast = range.endHour <= ist.currentHour;
+      return {
+        ...s,
+        ...range,
+        isCurrent,
+        isPast,
+        date: ist.todayIst,
+        dateLabel: 'Today',
+      };
+    });
+
+    const upcomingToday = enrichedToday.filter((s) => !s.isPast);
+    const currentSlot = enrichedToday.find((s) => s.isCurrent) || upcomingToday[0] || enrichedToday[0];
+
+    const totalBookingsUpcoming = upcomingToday.reduce((acc, s) => acc + s.maxBookings, 0);
+    const bookedBookingsUpcoming = upcomingToday.reduce((acc, s) => acc + s.bookedCount, 0);
+    const remainingBookingsToday = upcomingToday.reduce((acc, s) => acc + s.remainingBookings, 0);
+    const totalVolumeM3Upcoming = upcomingToday.reduce((acc, s) => acc + s.maxVolumeM3, 0);
+    const remainingVolumeM3Today = Math.round(
+      upcomingToday.reduce((acc, s) => acc + s.remainingVolumeM3, 0) * 10
+    ) / 10;
+
+    const bookingLoadPct =
+      totalBookingsUpcoming > 0 ? Math.round((bookedBookingsUpcoming / totalBookingsUpcoming) * 100) : 0;
+    const volumeLoadPct =
+      totalVolumeM3Upcoming > 0
+        ? Math.round(((totalVolumeM3Upcoming - remainingVolumeM3Today) / totalVolumeM3Upcoming) * 100)
+        : 0;
+    const utilizationPct = Math.min(100, Math.max(bookingLoadPct, volumeLoadPct));
+
+    const openTodaySlots = todayStatus.valid ? upcomingToday.filter((s) => !s.isFull) : [];
+    const openTomorrowSlots = tomorrowStatus.valid
+      ? tomorrowStatus.slots
+          .map((s) => ({
+            ...s,
+            ...parseSlotHourRange(s.id),
+            isCurrent: false,
+            isPast: false,
+            date: ist.tomorrowIst,
+            dateLabel: 'Tomorrow',
+          }))
+          .filter((s) => !s.isFull)
+      : [];
+
+    const nextAvailable =
+      openTodaySlots[0] ||
+      openTomorrowSlots[0] ||
+      (enrichedToday[0] ? { ...enrichedToday[0], date: ist.tomorrowIst, dateLabel: 'Tomorrow' } : null);
+
+    let statusMode: 'active' | 'high-demand' | 'scheduled' = 'active';
+    let statusHeadline = 'Active - Accepting Orders';
+    let statusHeadlineKn = 'ಸಕ್ರಿಯವಾಗಿದೆ - ಆರ್ಡರ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲಾಗುತ್ತಿದೆ';
+
+    const nextTimeDisplay = nextAvailable
+      ? `${nextAvailable.dateLabel === 'Tomorrow' ? 'Tomorrow ' : ''}${formatSlotShortTime(nextAvailable.label)}`
+      : 'Next Open Day';
+
+    if (!todayStatus.valid) {
+      statusMode = 'scheduled';
+      statusHeadline = `Scheduled Break - Next Slot Available at ${nextTimeDisplay}`;
+      statusHeadlineKn = `ಮುಂದಿನ ಲಭ್ಯವಿರುವ ಸ್ಲಾಟ್: ${nextTimeDisplay}`;
+    } else if (
+      openTodaySlots.length === 0 ||
+      Boolean(currentSlot?.isFull) ||
+      utilizationPct >= 65 ||
+      (currentSlot && currentSlot.remainingBookings <= 1)
+    ) {
+      statusMode = 'high-demand';
+      statusHeadline = `High Demand - Next Slot Available at ${nextTimeDisplay}`;
+      statusHeadlineKn = `ಹೆಚ್ಚಿನ ಬೇಡಿಕೆ - ಮುಂದಿನ ಸ್ಲಾಟ್: ${nextTimeDisplay}`;
+    }
+
+    const upcomingPreview = [
+      ...(todayStatus.valid ? upcomingToday : []),
+      ...(tomorrowStatus.valid
+        ? tomorrowStatus.slots.map((s) => ({
+            ...s,
+            ...parseSlotHourRange(s.id),
+            isCurrent: false,
+            isPast: false,
+            date: ist.tomorrowIst,
+            dateLabel: 'Tomorrow',
+          }))
+        : []),
+    ]
+      .slice(0, 4)
+      .map((s) => ({
+        date: s.date,
+        dateLabel: s.dateLabel,
+        id: s.id,
+        label: formatSlotShortTime(s.label),
+        isNight: Boolean(s.isNight),
+        isCurrent: s.isCurrent,
+        bookedCount: s.bookedCount,
+        maxBookings: s.maxBookings,
+        remainingBookings: s.remainingBookings,
+        remainingVolumeM3: s.remainingVolumeM3,
+        isFull: s.isFull,
+      }));
+
+    res.json({
+      statusMode,
+      statusHeadline,
+      statusHeadlineKn,
+      todayDate: ist.todayIst,
+      currentWindowLabel: currentSlot ? formatSlotShortTime(currentSlot.label) : '24 Hours Dispatch',
+      nextSlotDate: nextAvailable?.date || ist.todayIst,
+      nextSlotDateLabel: nextAvailable?.dateLabel || 'Today',
+      nextSlotId: nextAvailable?.id || 'slot-08-10',
+      nextSlotLabel: nextAvailable ? formatSlotShortTime(nextAvailable.label) : '08:00 AM – 10:00 AM',
+      utilizationPct,
+      remainingBookingsToday,
+      totalBookingsToday: totalBookingsUpcoming,
+      remainingVolumeM3Today,
+      activePlants: plantLocations.map((p) => ({
+        id: p.id,
+        shortLabel: p.shortLabel || p.name,
+        city: p.city,
+        hours: p.hours,
+      })),
+      upcomingSlots: upcomingPreview,
+      updatedAtIst: ist.istTimeLabel,
+      updatedAtIso: ist.updatedAtIso,
+    });
+  })
+);
+
 app.post(
   '/api/estimate',
   asyncRoute((req, res) => {
@@ -316,7 +498,7 @@ const bookingSchema = z.object({
   pumpType: z.enum(['none', 'line', 'boom']),
   deliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   slotId: z.string().min(1).max(40),
-  siteAddress: z.string().min(5).max(300),
+  siteAddress: z.string().trim().min(2, 'Please enter your delivery site address.').max(300),
   landmark: z.string().max(150).optional().default(''),
   city: z.string().min(2).max(80),
   siteLat: z.number().min(-90).max(90),
@@ -1205,6 +1387,73 @@ app.post('/api/enquiries', enquiryRateLimit, enquiryHandler);
 app.post('/api/contact', enquiryRateLimit, enquiryHandler);
 
 app.post(
+  '/api/testimonials',
+  rateLimit(8, 60 * 60 * 1000, 'public:testimonials'),
+  asyncRoute((req, res) => {
+    const schema = z.object({
+      authorName: z.string().trim().min(2, 'Please enter your name').max(120),
+      roleOrCompany: z.string().trim().max(120).optional().default('Verified Customer'),
+      location: z.string().trim().min(2, 'Please enter your city or town').max(100),
+      projectTitle: z.string().trim().min(3, 'Please enter a short project title').max(160),
+      segment: z
+        .enum(['Residential', 'Commercial', 'Industrial', 'Infrastructure'])
+        .optional()
+        .default('Residential'),
+      gradeUsed: z.string().trim().max(80).optional().default('M25 Ready-Mix'),
+      volumeNote: z.string().trim().max(80).optional().default(''),
+      rating: z.coerce.number().int().min(1).max(5),
+      quote: z.string().trim().min(12, 'Please share at least a sentence of feedback').max(600),
+      website_url: z.string().optional().default(''),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0]?.message || 'Please check review fields.' });
+      return;
+    }
+
+    const d = parsed.data;
+    if (d.website_url.trim().length > 0) {
+      res.status(400).json({ error: 'Spam check triggered.' });
+      return;
+    }
+
+    const defaultPhotoBySegment: Record<string, string> = {
+      Residential: '/src/assets/images/story_villa_slab_pour_1795432596043.jpg',
+      Commercial: '/src/assets/images/story_commercial_frame_1795432595761.jpg',
+      Industrial: '/src/assets/images/story_industrial_floor_1795432596007.jpg',
+      Infrastructure: '/src/assets/images/story_cement_bricks_site_1795432596111.jpg',
+    };
+
+    const insertRes = db
+      .prepare(
+        `INSERT INTO testimonials (
+          author_name, role_or_company, location, quote, rating,
+          project_title, segment, grade_used, volume_note, project_image_url, published
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+      )
+      .run(
+        sanitizeText(d.authorName, 120),
+        sanitizeText(d.roleOrCompany || 'Verified Customer', 120),
+        sanitizeText(d.location, 100),
+        sanitizeMultiline(d.quote, 600),
+        d.rating,
+        sanitizeText(d.projectTitle, 160),
+        sanitizeText(d.segment, 40),
+        sanitizeText(d.gradeUsed || 'M25 Ready-Mix', 80),
+        sanitizeText(d.volumeNote || '', 80),
+        defaultPhotoBySegment[d.segment] || defaultPhotoBySegment.Residential
+      );
+
+    const created = db
+      .prepare(`SELECT * FROM testimonials WHERE id = ?`)
+      .get(Number(insertRes.lastInsertRowid));
+
+    res.status(201).json({ ok: true, id: Number(insertRes.lastInsertRowid), testimonial: created });
+  })
+);
+
+app.post(
   '/api/newsletter',
   rateLimit(5, 60 * 60 * 1000, 'lead:newsletter'),
   asyncRoute((req, res) => {
@@ -1815,6 +2064,18 @@ app.delete('/api/admin/users/:id', requireAdmin, requireOwner, (req: AuthedReque
   res.json({ ok: true });
 });
 
+function normalizeSupaNotifyStatus(val: unknown): string {
+  const s = String(val ?? '').trim().toLowerCase();
+  return ['sent', 'failed', 'skipped', 'pending'].includes(s) ? s : 'pending';
+}
+
+function shouldAdoptSupabaseNotify(row: Record<string, unknown>): boolean {
+  const emailSt = normalizeSupaNotifyStatus(row.notify_email_status);
+  const waSt = normalizeSupaNotifyStatus(row.notify_whatsapp_status);
+  const notifiedAt = String(row.notified_at ?? '').trim();
+  return Boolean(notifiedAt) || emailSt === 'sent' || emailSt === 'failed' || waSt === 'sent' || waSt === 'failed';
+}
+
 function hydrateBookingsFromSupabase(supaRows: Array<Record<string, unknown>>): void {
   if (!supaRows.length) return;
   const insertStmt = db.prepare(
@@ -1823,13 +2084,22 @@ function hydrateBookingsFromSupabase(supaRows: Array<Record<string, unknown>>): 
       usage_type, slump_mm, pump_type, delivery_date, slot_id, slot_label,
       site_address, landmark, city, site_lat, site_lng, distance_km,
       estimated_concrete_amount, estimated_delivery_fee, estimated_pump_fee, estimated_total,
-      customer_name, phone, email, gst_number, notes, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      customer_name, phone, email, gst_number, notes, status,
+      email_status, whatsapp_status, notified_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  const syncNotifyStmt = db.prepare(
+    `UPDATE bookings
+     SET email_status = ?, whatsapp_status = ?, notified_at = COALESCE(NULLIF(?, ''), notified_at)
+     WHERE booking_code = ?`
   );
 
   for (const row of supaRows) {
     const code = sanitizeText(row.booking_code, 40).toUpperCase();
     if (!code) continue;
+    const emailSt = normalizeSupaNotifyStatus(row.notify_email_status);
+    const waSt = normalizeSupaNotifyStatus(row.notify_whatsapp_status);
+    const notifiedAt = row.notified_at ? String(row.notified_at) : '';
     insertStmt.run(
       code,
       sanitizeText(row.product_slug, 100),
@@ -1859,9 +2129,15 @@ function hydrateBookingsFromSupabase(supaRows: Array<Record<string, unknown>>): 
       sanitizeText(row.gst_number || '', 25),
       sanitizeMultiline(row.notes || '', 600),
       sanitizeText(row.status || 'confirmed', 30),
+      emailSt,
+      waSt,
+      notifiedAt,
       String(row.created_at || new Date().toISOString()),
       String(row.updated_at || row.created_at || new Date().toISOString())
     );
+    if (shouldAdoptSupabaseNotify(row)) {
+      syncNotifyStmt.run(emailSt, waSt, notifiedAt, code);
+    }
   }
 }
 
@@ -1912,12 +2188,20 @@ app.get(
         const stmt = db.prepare(
           `INSERT OR IGNORE INTO site_visits (
             visit_code, visit_type, preferred_date, preferred_time, location,
-            customer_name, phone, email, notes, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            customer_name, phone, email, notes, status, email_status, whatsapp_status, notified_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        );
+        const syncVisitNotifyStmt = db.prepare(
+          `UPDATE site_visits
+           SET email_status = ?, whatsapp_status = ?, notified_at = COALESCE(NULLIF(?, ''), notified_at)
+           WHERE visit_code = ?`
         );
         for (const sv of supaVisits.rows) {
           const code = sanitizeText(sv.visit_code, 40).toUpperCase();
           if (!code) continue;
+          const emailSt = normalizeSupaNotifyStatus(sv.notify_email_status);
+          const waSt = normalizeSupaNotifyStatus(sv.notify_whatsapp_status);
+          const notifiedAt = sv.notified_at ? String(sv.notified_at) : '';
           stmt.run(
             code,
             sanitizeText(sv.visit_type, 40),
@@ -1929,8 +2213,14 @@ app.get(
             sanitizeText(sv.email || '', 120),
             sanitizeMultiline(sv.notes || '', 600),
             sanitizeText(sv.status || 'scheduled', 30),
+            emailSt,
+            waSt,
+            notifiedAt,
             String(sv.created_at || new Date().toISOString())
           );
+          if (shouldAdoptSupabaseNotify(sv)) {
+            syncVisitNotifyStmt.run(emailSt, waSt, notifiedAt, code);
+          }
         }
       }
 
@@ -1938,12 +2228,21 @@ app.get(
         const stmt = db.prepare(
           `INSERT OR IGNORE INTO quotes (
             quote_code, project_type, grade, quantity_m3, location, timeline,
-            customer_name, phone, email, notes, attachment_name, attachment_data, status, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?)`
+            customer_name, phone, email, notes, attachment_name, attachment_data, status,
+            email_status, whatsapp_status, notified_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`
+        );
+        const syncQuoteNotifyStmt = db.prepare(
+          `UPDATE quotes
+           SET email_status = ?, whatsapp_status = ?, notified_at = COALESCE(NULLIF(?, ''), notified_at)
+           WHERE quote_code = ?`
         );
         for (const q of supaQuotes.rows) {
           const code = sanitizeText(q.quote_code, 40).toUpperCase();
           if (!code) continue;
+          const emailSt = normalizeSupaNotifyStatus(q.notify_email_status);
+          const waSt = normalizeSupaNotifyStatus(q.notify_whatsapp_status);
+          const notifiedAt = q.notified_at ? String(q.notified_at) : '';
           stmt.run(
             code,
             sanitizeText(q.project_type, 100),
@@ -1957,8 +2256,14 @@ app.get(
             sanitizeMultiline(q.notes || '', 1000),
             sanitizeText(q.attachment_name || '', 150),
             sanitizeText(q.status || 'new', 30),
+            emailSt,
+            waSt,
+            notifiedAt,
             String(q.created_at || new Date().toISOString())
           );
+          if (shouldAdoptSupabaseNotify(q)) {
+            syncQuoteNotifyStmt.run(emailSt, waSt, notifiedAt, code);
+          }
         }
       }
 
@@ -1967,15 +2272,26 @@ app.get(
           `SELECT id FROM enquiries WHERE phone = ? AND name = ? AND message = ? LIMIT 1`
         );
         const insertStmt = db.prepare(
-          `INSERT INTO enquiries (type, name, phone, email, city, company_or_role, message, consent, status, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO enquiries (
+            type, name, phone, email, city, company_or_role, message, consent, status,
+            email_status, whatsapp_status, notified_at, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        );
+        const syncEnqNotifyStmt = db.prepare(
+          `UPDATE enquiries
+           SET email_status = ?, whatsapp_status = ?, notified_at = COALESCE(NULLIF(?, ''), notified_at)
+           WHERE id = ?`
         );
         for (const enq of supaEnquiries.rows) {
           const name = sanitizeText(enq.name, 120);
           const phone = sanitizeText(enq.phone, 20);
           const message = sanitizeMultiline(enq.message, 1500);
           if (!name || !phone || !message) continue;
-          if (!checkStmt.get(phone, name, message)) {
+          const emailSt = normalizeSupaNotifyStatus(enq.notify_email_status);
+          const waSt = normalizeSupaNotifyStatus(enq.notify_whatsapp_status);
+          const notifiedAt = enq.notified_at ? String(enq.notified_at) : '';
+          const existing = checkStmt.get(phone, name, message) as { id: number } | undefined;
+          if (!existing) {
             insertStmt.run(
               sanitizeText(enq.type || 'contact', 30),
               name,
@@ -1986,8 +2302,13 @@ app.get(
               message,
               enq.consent === false ? 0 : 1,
               sanitizeText(enq.status || 'new', 30),
+              emailSt,
+              waSt,
+              notifiedAt,
               String(enq.created_at || new Date().toISOString())
             );
+          } else if (shouldAdoptSupabaseNotify(enq)) {
+            syncEnqNotifyStmt.run(emailSt, waSt, notifiedAt, existing.id);
           }
         }
       }
@@ -2039,7 +2360,19 @@ app.get(
 
     const customerMap = new Map<
       string,
-      { name: string; phone: string; email: string; city: string; totalOrders: number; totalM3: number }
+      {
+        name: string;
+        phone: string;
+        email: string;
+        city: string;
+        siteAddress: string;
+        landmark: string;
+        gstNumber: string;
+        siteLat: number;
+        siteLng: number;
+        totalOrders: number;
+        totalM3: number;
+      }
     >();
     for (const b of bookings) {
       const phone = String(b.phone);
@@ -2048,12 +2381,20 @@ app.get(
       if (existing) {
         existing.totalOrders += 1;
         existing.totalM3 += vol;
+        if (!existing.siteAddress && b.site_address) {
+          existing.siteAddress = String(b.site_address);
+        }
       } else {
         customerMap.set(phone, {
           name: String(b.customer_name),
           phone,
           email: String(b.email || ''),
           city: String(b.city || ''),
+          siteAddress: String(b.site_address || ''),
+          landmark: String(b.landmark || ''),
+          gstNumber: String(b.gst_number || ''),
+          siteLat: Number(b.site_lat || 0),
+          siteLng: Number(b.site_lng || 0),
           totalOrders: 1,
           totalM3: vol,
         });
@@ -2466,7 +2807,66 @@ app.post(
       res.status(400).json({ error: 'Invalid resend payload' });
       return;
     }
-    const result = await resendLeadNotificationByRecord(parsed.data.kind, parsed.data.id);
+
+    const { kind, id } = parsed.data;
+    if (isSupabaseConfigured() && kind !== 'newsletter') {
+      const supaTableMap: Record<'booking' | 'quote' | 'visit' | 'enquiry', SupabaseLeadTable> = {
+        booking: 'bookings',
+        quote: 'quotes',
+        visit: 'site_visits',
+        enquiry: 'enquiries',
+      };
+      const localTable = supaTableMap[kind];
+      const row = db.prepare(`SELECT * FROM ${localTable} WHERE id = ?`).get(id) as
+        | Record<string, unknown>
+        | undefined;
+      if (!row) {
+        res.status(404).json({ error: 'Record not found' });
+        return;
+      }
+
+      const edgeRes = await invokeSupabaseNotifyLead(localTable, row);
+      if (edgeRes.invoked) {
+        const emailStatus = edgeRes.notify_email_status || edgeRes.emailResult?.status || 'pending';
+        const waStatus = edgeRes.notify_whatsapp_status || edgeRes.whatsappResult?.status || 'pending';
+        const notifiedAt = edgeRes.notified_at || new Date().toISOString();
+        const emailErr = edgeRes.emailResult?.error || '';
+        const waErr = edgeRes.whatsappResult?.error || '';
+
+        db.prepare(
+          `UPDATE ${localTable}
+           SET email_status = ?, email_error = ?, whatsapp_status = ?, whatsapp_error = ?, notified_at = ?
+           WHERE id = ?`
+        ).run(emailStatus, emailErr, waStatus, waErr, notifiedAt, id);
+
+        const refCode = String(
+          row.booking_code || row.quote_code || row.visit_code || row.enquiry_code || `${kind.toUpperCase()}-${id}`
+        );
+        db.prepare(
+          `INSERT INTO email_logs (recipient, subject, body_preview, delivery_mode, channel, reference_code, error_detail)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(
+          process.env.NOTIFY_EMAIL?.trim() || 'myconcretektl@gmail.com',
+          `Supabase Edge Resend (${refCode})`,
+          `Email=${emailStatus}, WhatsApp=${waStatus}`,
+          `supabase_edge_${emailStatus}`,
+          'supabase',
+          refCode,
+          [emailErr, waErr].filter(Boolean).join(' | ')
+        );
+
+        res.json({
+          ok: true,
+          found: true,
+          supabaseEdgeFunction: true,
+          emailResult: edgeRes.emailResult || { ok: emailStatus === 'sent', status: emailStatus, provider: 'resend' },
+          whatsappResult: edgeRes.whatsappResult || { ok: waStatus === 'sent', status: waStatus, provider: 'supabase' },
+        });
+        return;
+      }
+    }
+
+    const result = await resendLeadNotificationByRecord(kind, id);
     if (!result.found) {
       res.status(404).json({ error: 'Record not found' });
       return;
@@ -2602,17 +3002,37 @@ app.delete('/api/admin/blogs/:id', requireAdmin, requireOwner, (req, res) => {
 });
 
 app.post('/api/admin/testimonials', requireAdmin, requireOwner, (req, res) => {
-  const { authorName, roleOrCompany, location, quote } = req.body;
+  const {
+    authorName,
+    roleOrCompany,
+    location,
+    quote,
+    rating,
+    projectTitle,
+    segment,
+    gradeUsed,
+    volumeNote,
+    projectImageUrl,
+  } = req.body;
+  const parsedRating = Math.min(5, Math.max(1, Math.round(Number(rating) || 5)));
   const info = db
     .prepare(
-      `INSERT INTO testimonials (author_name, role_or_company, location, quote, published)
-       VALUES (?, ?, ?, ?, 1)`
+      `INSERT INTO testimonials (
+        author_name, role_or_company, location, quote, rating,
+        project_title, segment, grade_used, volume_note, project_image_url, published
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
     )
     .run(
       sanitizeText(authorName, 120),
       sanitizeText(roleOrCompany, 120),
       sanitizeText(location, 100),
-      sanitizeMultiline(quote, 600)
+      sanitizeMultiline(quote, 600),
+      parsedRating,
+      sanitizeText(projectTitle || '', 160),
+      sanitizeText(segment || 'Residential', 40),
+      sanitizeText(gradeUsed || '', 80),
+      sanitizeText(volumeNote || '', 80),
+      sanitizeText(projectImageUrl || '', 500)
     );
   res.status(201).json({ id: Number(info.lastInsertRowid) });
 });

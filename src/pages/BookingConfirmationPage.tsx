@@ -4,7 +4,8 @@ import { CalendarPlus, CheckCircle2, Download, Mail, MessageCircle, Phone } from
 import { useApp } from '../context/AppContext.tsx';
 import { useDocumentMeta } from '../utils/seo.ts';
 import { readApiJson } from '../utils/api.ts';
-import { CallLink } from '../components/ContactLinks.tsx';
+import { CallLink, MailLink } from '../components/ContactLinks.tsx';
+import { CONTACT_CONFIG } from '../config/contact.ts';
 import {
   buildWhatsAppUrl,
   downloadBookingIcs,
@@ -61,8 +62,8 @@ export function BookingConfirmationPage() {
   const biz = data?.businessConfig;
   const isPieces = booking.unit_type === 'pieces';
   const unitLabel = isPieces ? 'pieces' : 'm³';
-  const ownerEmail = biz?.email || 'myconcretektl@gmail.com';
-  const ownerWhatsapp = biz?.whatsapp || biz?.phone || '+91 73378 07372';
+  const ownerEmail = biz?.email || CONTACT_CONFIG.email;
+  const ownerWhatsapp = biz?.whatsapp || biz?.phone || CONTACT_CONFIG.whatsappDisplay;
 
   const fullBookingMessage = [
     `*MY CONCRETE BOOKING: ${booking.booking_code}* (${booking.status.toUpperCase()})`,
@@ -88,9 +89,7 @@ export function BookingConfirmationPage() {
     .join('\n');
 
   const whatsappUrl = buildWhatsAppUrl(ownerWhatsapp, fullBookingMessage);
-  const mailtoUrl = `mailto:${ownerEmail}?subject=${encodeURIComponent(
-    `MY CONCRETE Booking ${booking.booking_code} – ${booking.customer_name}`
-  )}&body=${encodeURIComponent(fullBookingMessage)}`;
+  const bookingEmailSubject = `MY CONCRETE Booking ${booking.booking_code} – ${booking.customer_name}`;
 
   return (
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-8">
@@ -169,15 +168,15 @@ export function BookingConfirmationPage() {
             <span>Send on WhatsApp</span>
           </a>
 
-          <a
-            href={mailtoUrl}
-            target="_top"
-            rel="noopener"
-            className="inline-flex items-center gap-2 rounded-full bg-[#D92B25] text-white px-4 min-h-[44px] py-2.5 text-sm font-semibold hover:brightness-110"
+          <MailLink
+            email={ownerEmail}
+            subject={bookingEmailSubject}
+            body={fullBookingMessage}
+            className="justify-center gap-2 rounded-full bg-[#D92B25] text-white px-4 py-2.5 text-sm font-semibold hover:brightness-110"
           >
             <Mail className="w-4 h-4" />
             <span>Send via Email</span>
-          </a>
+          </MailLink>
 
           <button
             type="button"

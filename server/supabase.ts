@@ -377,3 +377,108 @@ export async function fetchQuotesFromSupabase(): Promise<SupabaseFetchResult> {
 export async function fetchEnquiriesFromSupabase(): Promise<SupabaseFetchResult> {
   return fetchTableFromSupabase('enquiries', 'created_at');
 }
+
+export type SupabaseLeadTable = 'bookings' | 'quotes' | 'enquiries' | 'site_visits';
+
+export interface SupabaseInvokeResult {
+  invoked: boolean;
+  notify_email_status?: 'sent' | 'failed' | 'skipped';
+  notify_whatsapp_status?: 'sent' | 'failed' | 'skipped';
+  notified_at?: string;
+  emailResult?: {
+    ok: boolean;
+    status: 'sent' | 'failed' | 'skipped';
+    provider: string;
+    error?: string;
+  };
+  whatsappResult?: {
+    ok: boolean;
+    status: 'sent' | 'failed' | 'skipped';
+    provider: string;
+    error?: string;
+  };
+  reason?: string;
+}
+
+export async function invokeSupabaseNotifyLead(
+  table: SupabaseLeadTable,
+  record: Record<string, unknown>
+): Promise<SupabaseInvokeResult> {
+  const cfg = getSupabaseConfig();
+  if (!cfg) {
+    return { invoked: false, reason: 'Supabase not configured' };
+  }
+
+  const endpoint = `${cfg.url.replace(/\/+$/, '')}/functions/v1/notify-lead`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    apikey: cfg.key,
+    Authorization: `Bearer ${cfg.key}`,
+  };
+  const webhookSecret = process.env.WEBHOOK_SECRET?.trim();
+  if (webhookSecret) {
+    headers['x-webhook-secret'] = webhookSecret;
+  }
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        type: 'RESEND',
+        table,
+        record,
+      }),
+    });
+
+    const data = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+    if (!res.ok || !data || data.ok !== true) {
+      const msg =
+        (data && typeof data.error === 'string' && data.error) ||
+        `Supabase Edge Function HTTP ${res.status}`;
+      return { invoked: false, reason: msg };
+    }
+
+    return {
+      invoked: true,
+      notify_email_status: data.notify_email_status as 'sent' | 'failed' | 'skipped' | undefined,
+      notify_whatsapp_status: data.notify_whatsapp_status as 'sent' | 'failed' | 'skipped' | undefined,
+      notified_at: typeof data.notified_at === 'string' ? data.notified_at : new Date().toISOString(),
+      emailResult: data.emailResult as SupabaseInvokeResult['emailResult'],
+      whatsappResult: data.whatsappResult as SupabaseInvokeResult['whatsappResult'],
+    };
+  } catch (err) {
+    return {
+      invoked: false,
+      reason: err instanceof Error ? err.message : 'Failed to invoke Supabase notify-lead function',
+    };
+  }
+}
+
+export async function syncNotifyStatusToSupabase(
+  table: SupabaseLeadTable,
+  matchColumn: string,
+  matchValue: string | number,
+  patch: {
+    notify_email_status?: string;
+    notify_whatsapp_status?: string;
+    notified_at?: string;
+  }
+): Promise<SupabaseSyncResult> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { synced: false, reason: 'Supabase not configured' };
+  }
+
+  try {
+    const { error } = await client.from(table).update(patch).eq(matchColumn, matchValue);
+    if (error) {
+      return { synced: false, code: error.code, reason: error.message };
+    }
+    return { synced: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unknown Supabase status patch error';
+    return { synced: false, reason: msg };
+  }
+}
+

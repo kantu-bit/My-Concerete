@@ -2,14 +2,31 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Copy, ExternalLink, Mail, MessageCircle, Phone, X } from 'lucide-react';
 import { useApp } from '../context/AppContext.tsx';
+import { CONTACT_CONFIG } from '../config/contact.ts';
 import { buildWhatsAppUrl, cleanPhoneDigits } from '../utils/documents.ts';
 
-export const DEFAULT_PHONE_DISPLAY = '+91 73378 07372';
-export const DEFAULT_EMAIL_DISPLAY = 'myconcretektl@gmail.com';
+export const DEFAULT_PHONE_DISPLAY = CONTACT_CONFIG.phoneDisplay;
+export const DEFAULT_EMAIL_DISPLAY = CONTACT_CONFIG.email;
 
 export function formatTelHref(phoneDisplay: string): string {
-  const digits = cleanPhoneDigits(phoneDisplay || DEFAULT_PHONE_DISPLAY);
-  return `tel:+${digits || '917337807372'}`;
+  const digits = cleanPhoneDigits(phoneDisplay || CONTACT_CONFIG.phoneDisplay);
+  return `tel:+${digits || CONTACT_CONFIG.phoneDigits}`;
+}
+
+export function formatMailtoHref(email: string, subject?: string, body?: string): string {
+  const addr = (email || CONTACT_CONFIG.email).trim();
+  const params = new URLSearchParams();
+  if (subject) params.set('subject', subject);
+  if (body) params.set('body', body);
+  const qs = params.toString();
+  return qs ? `mailto:${addr}?${qs}` : `mailto:${addr}`;
+}
+
+export function buildGmailComposeUrl(email: string, subject?: string, body?: string): string {
+  const addr = (email || CONTACT_CONFIG.email).trim();
+  const subj = (subject || CONTACT_CONFIG.defaultEmailSubject).trim();
+  const base = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(addr)}&su=${encodeURIComponent(subj)}`;
+  return body ? `${base}&body=${encodeURIComponent(body)}` : base;
 }
 
 export function isPreviewIframe(): boolean {
@@ -28,14 +45,12 @@ export function isDesktopOrIframe(): boolean {
   const hasTouch =
     'ontouchstart' in window ||
     (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
-  const isCoarsePointer =
-    typeof window.matchMedia === 'function' &&
-    (window.matchMedia('(pointer: coarse)').matches ||
-      window.matchMedia('(hover: none)').matches);
+  const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+  const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
 
-  // Only treat as native mobile dialer when NOT in an iframe AND touch + coarse pointer are present
-  const isNativeMobile = hasTouch && isCoarsePointer;
-  return !isNativeMobile;
+  // Only bypass popup on real mobile devices outside an iframe; desktop & iframes get smart popup
+  const isRealMobileOutsideIframe = hasTouch && isMobileUA;
+  return !isRealMobileOutsideIframe;
 }
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
@@ -74,10 +89,138 @@ interface CallLinkProps {
   children?: React.ReactNode;
 }
 
+export function CallPopupModal({
+  open,
+  onClose,
+  phoneDisplay,
+  whatsappHref,
+  telHref,
+}: {
+  open: boolean;
+  onClose: () => void;
+  phoneDisplay: string;
+  whatsappHref: string;
+  telHref: string;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setCopied(false);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  async function handleCopy() {
+    const ok = await copyTextToClipboard(phoneDisplay);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  }
+
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="mc-call-modal-title"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0F1F5C]/70 backdrop-blur-xs p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-[18px] bg-white dark:bg-[#152972] border border-[#D7E4FF] dark:border-[#264096] p-6 shadow-2xl space-y-5 text-[#0F1F5C] dark:text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#1F3FA8] text-[#FFC93C] flex items-center justify-center shrink-0">
+              <Phone className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#D92B25]">
+                24/7 Dispatch Desk
+              </p>
+              <h2 id="mc-call-modal-title" className="font-display font-bold text-lg">
+                Call MY CONCRETE
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close popup"
+            className="p-1.5 rounded-full text-[var(--muted)] hover:bg-[#EAF1FF] dark:hover:bg-[#1F3FA8] cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="rounded-xl bg-[#F7FAFF] dark:bg-[#0F1F5C] border border-[#D7E4FF] dark:border-[#264096] px-4 py-3.5 text-center space-y-1">
+          <a
+            href={telHref}
+            target="_top"
+            rel="noopener"
+            className="font-slab font-bold text-2xl text-[#1F3FA8] dark:text-[#FFC93C] tabular-nums hover:underline inline-flex items-center min-h-[44px]"
+          >
+            {phoneDisplay}
+          </a>
+          <p className="text-xs text-[var(--muted)]">
+            Kotihal &amp; Davangere Units · 24 Hours Dispatch
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F3FA8] hover:bg-[#173187] text-white px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
+          >
+            {copied ? (
+              <>
+                <Check className="w-4 h-4 text-[#FFC93C]" />
+                <span>Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-4 h-4" />
+                <span>Copy number</span>
+              </>
+            )}
+          </button>
+
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
+          >
+            <MessageCircle className="w-4 h-4" />
+            <span>Open WhatsApp</span>
+          </a>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#D7E4FF] dark:border-[#264096] px-4 py-2.5 text-sm font-semibold text-[var(--muted)] hover:text-[#0F1F5C] dark:hover:text-white transition-colors cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export function CallLink({
   phone,
   whatsapp,
-  whatsappMessage = 'Hi MY CONCRETE, I would like to enquire about ready-mix concrete.',
+  whatsappMessage,
   className = '',
   ariaLabel,
   title,
@@ -86,39 +229,20 @@ export function CallLink({
 }: CallLinkProps) {
   const { data } = useApp();
   const biz = data?.businessConfig;
-  const phoneDisplay = phone || biz?.phone || DEFAULT_PHONE_DISPLAY;
+  const phoneDisplay = phone || biz?.phone || CONTACT_CONFIG.phoneDisplay;
   const whatsappDisplay = whatsapp || biz?.whatsapp || phoneDisplay;
   const telHref = formatTelHref(phoneDisplay);
   const whatsappHref = buildWhatsAppUrl(whatsappDisplay, whatsappMessage);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!modalOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setModalOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [modalOpen]);
 
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (isDesktopOrIframe()) {
       e.preventDefault();
       onBeforePopup?.();
-      setCopied(false);
       setModalOpen(true);
     }
     // On real mobile outside an iframe, do NOT preventDefault: let native tel: dial directly.
-  }
-
-  async function handleCopy() {
-    const ok = await copyTextToClipboard(phoneDisplay);
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    }
   }
 
   return (
@@ -130,110 +254,26 @@ export function CallLink({
         onClick={handleClick}
         aria-label={ariaLabel || `Call ${phoneDisplay}`}
         title={title || `Call ${phoneDisplay}`}
-        className={`cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFC93C] ${className}`}
+        className={`relative z-50 inline-flex items-center min-h-[44px] cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFC93C] ${className}`}
       >
         {children ?? phoneDisplay}
       </a>
 
-      {modalOpen &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mc-call-modal-title"
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#0F1F5C]/70 backdrop-blur-xs p-4"
-            onClick={() => setModalOpen(false)}
-          >
-            <div
-              className="w-full max-w-sm rounded-[18px] bg-white dark:bg-[#152972] border border-[#D7E4FF] dark:border-[#264096] p-6 shadow-2xl space-y-5 text-[#0F1F5C] dark:text-white"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#1F3FA8] text-[#FFC93C] flex items-center justify-center shrink-0">
-                    <Phone className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-[#D92B25]">
-                      24/7 Dispatch Desk
-                    </p>
-                    <h2 id="mc-call-modal-title" className="font-display font-bold text-lg">
-                      Call MY CONCRETE
-                    </h2>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  aria-label="Close popup"
-                  className="p-1.5 rounded-full text-[var(--muted)] hover:bg-[#EAF1FF] dark:hover:bg-[#1F3FA8] cursor-pointer"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="rounded-xl bg-[#F7FAFF] dark:bg-[#0F1F5C] border border-[#D7E4FF] dark:border-[#264096] px-4 py-3.5 text-center space-y-1">
-                <a
-                  href={telHref}
-                  target="_top"
-                  rel="noopener"
-                  className="font-slab font-bold text-2xl text-[#1F3FA8] dark:text-[#FFC93C] tabular-nums hover:underline inline-block"
-                >
-                  {phoneDisplay}
-                </a>
-                <p className="text-xs text-[var(--muted)]">
-                  Kotihal Unit · Serving Ranebennur &amp; Davangere 24 Hours
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2.5">
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F3FA8] hover:bg-[#173187] text-white px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-4 h-4 text-[#FFC93C]" />
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      <span>Copy number</span>
-                    </>
-                  )}
-                </button>
-
-                <a
-                  href={whatsappHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Open WhatsApp</span>
-                </a>
-
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="w-full min-h-[44px] inline-flex items-center justify-center rounded-xl border border-[#D7E4FF] dark:border-[#264096] px-4 py-2.5 text-sm font-semibold text-[var(--muted)] hover:text-[#0F1F5C] dark:hover:text-white transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      <CallPopupModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        phoneDisplay={phoneDisplay}
+        whatsappHref={whatsappHref}
+        telHref={telHref}
+      />
     </>
   );
 }
 
-interface EmailLinkProps {
+interface MailLinkProps {
   email?: string;
+  subject?: string;
+  body?: string;
   className?: string;
   ariaLabel?: string;
   title?: string;
@@ -241,18 +281,21 @@ interface EmailLinkProps {
   children?: React.ReactNode;
 }
 
-export function EmailLink({
+export function MailLink({
   email,
+  subject,
+  body,
   className = '',
   ariaLabel,
   title,
   onBeforePopup,
   children,
-}: EmailLinkProps) {
+}: MailLinkProps) {
   const { data } = useApp();
   const biz = data?.businessConfig;
-  const emailDisplay = email || biz?.email || DEFAULT_EMAIL_DISPLAY;
-  const mailtoHref = `mailto:${emailDisplay}`;
+  const emailDisplay = email || biz?.email || CONTACT_CONFIG.email;
+  const mailtoHref = formatMailtoHref(emailDisplay, subject, body);
+  const gmailHref = buildGmailComposeUrl(emailDisplay, subject, body);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -273,7 +316,7 @@ export function EmailLink({
       setCopied(false);
       setModalOpen(true);
     }
-    // On real mobile outside an iframe, allow native mailto: directly.
+    // On real mobile outside an iframe, allow native mailto: directly without preventDefault.
   }
 
   async function handleCopy() {
@@ -293,7 +336,7 @@ export function EmailLink({
         onClick={handleClick}
         aria-label={ariaLabel || `Email ${emailDisplay}`}
         title={title || `Email ${emailDisplay}`}
-        className={`cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFC93C] ${className}`}
+        className={`relative z-50 inline-flex items-center min-h-[44px] cursor-pointer hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFC93C] ${className}`}
       >
         {children ?? emailDisplay}
       </a>
@@ -337,9 +380,14 @@ export function EmailLink({
               </div>
 
               <div className="rounded-xl bg-[#F7FAFF] dark:bg-[#0F1F5C] border border-[#D7E4FF] dark:border-[#264096] px-4 py-3.5 text-center space-y-1">
-                <p className="font-mono font-semibold text-base text-[#1F3FA8] dark:text-[#FFC93C] break-all">
+                <a
+                  href={mailtoHref}
+                  target="_top"
+                  rel="noopener"
+                  className="font-mono font-semibold text-base text-[#1F3FA8] dark:text-[#FFC93C] break-all hover:underline inline-flex items-center min-h-[44px]"
+                >
                   {emailDisplay}
-                </p>
+                </a>
                 <p className="text-xs text-[var(--muted)]">
                   For BOQs, structural drawings, quotes &amp; partnerships
                 </p>
@@ -365,13 +413,13 @@ export function EmailLink({
                 </button>
 
                 <a
-                  href={mailtoHref}
-                  target="_top"
-                  rel="noopener"
+                  href={gmailHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-[#D92B25] hover:bg-[#B9221D] text-white px-4 py-2.5 text-sm font-semibold transition-colors cursor-pointer"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  <span>Open Email App</span>
+                  <span>Open Gmail</span>
                 </a>
 
                 <button
@@ -390,6 +438,8 @@ export function EmailLink({
   );
 }
 
+export { MailLink as EmailLink };
+
 export function CopyPhoneButton({
   phone,
   className = '',
@@ -398,7 +448,7 @@ export function CopyPhoneButton({
   className?: string;
 }) {
   const { data } = useApp();
-  const phoneDisplay = phone || data?.businessConfig?.phone || DEFAULT_PHONE_DISPLAY;
+  const phoneDisplay = phone || data?.businessConfig?.phone || CONTACT_CONFIG.phoneDisplay;
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {

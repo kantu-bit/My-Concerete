@@ -75,6 +75,7 @@ export interface MosaicTile {
   tone: 'blue' | 'navy' | 'red';
   visualKey: string;
   imageUrl?: string;
+  objectPosition?: string;
 }
 
 export interface HeroSlide {
@@ -91,6 +92,8 @@ export interface HeroSlide {
   themeStyle?: 'light' | 'dark' | 'mosaic';
   visualKey: string;
   imageUrl: string;
+  objectPosition?: string;
+  alt?: string;
   mosaicTiles?: MosaicTile[];
 }
 
@@ -175,7 +178,14 @@ export interface TestimonialItem {
   role_or_company: string;
   location: string;
   quote: string;
+  rating: number;
+  project_title?: string;
+  segment?: string;
+  grade_used?: string;
+  volume_note?: string;
+  project_image_url?: string;
   published: number;
+  created_at?: string;
 }
 
 export interface SlotAvailability extends SlotConfig {
@@ -224,6 +234,8 @@ export interface BookingRecord {
   email_error?: string;
   whatsapp_status?: string;
   whatsapp_error?: string;
+  notify_email_status?: string;
+  notify_whatsapp_status?: string;
   notified_at?: string;
   created_at: string;
   updated_at: string;
