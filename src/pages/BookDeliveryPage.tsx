@@ -15,6 +15,7 @@ import { useDocumentMeta } from '../utils/seo.ts';
 import { FRIENDLY_API_ERROR, parseJsonResponse, readApiJson } from '../utils/api.ts';
 import { PlantMap } from '../components/PlantMap.tsx';
 import type { SlotAvailability } from '../types/index.ts';
+import { CONTACT_CONFIG } from '../config/contact.ts';
 
 interface BookingDraft {
   productSlug: string;
@@ -137,16 +138,16 @@ export function BookDeliveryPage() {
               id: 'davangere',
               name: 'MY CONCRETE – Davangere Unit',
               shortLabel: 'Davangere',
-              address: 'Davangere, Karnataka 577001',
+              address: CONTACT_CONFIG.davangereUnitAddress,
               city: 'Davangere',
-              postalCode: '577001',
+              postalCode: CONTACT_CONFIG.davangerePostalCode,
               lat: 14.4644,
               lng: 75.9218,
               phone: '+91 73378 07372',
               whatsapp: '+91 73378 07372',
               hours: 'Open 24 Hours (All Days)',
               serviceRadiusKm: 50,
-              googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+              googleMapsUrl: CONTACT_CONFIG.davangereGoogleMapsUrl,
               pinColor: 'red' as const,
               isPrimary: false,
             },

@@ -11,4 +11,9 @@ export const CONTACT_CONFIG = {
   },
   corporateOfficeAddress:
     '"VIJAYA SANKALPA NIVASA" I.H. Patil & Co. Corporate Office, 1st Main, 3rd Cross, Halageri Road, Beereshwara Nagar, Ranebennur - 581115',
+  davangereUnitAddress:
+    'Lokikere Road, Shiramagondanahally Hosabadavne, Davangere, Karnataka 577005',
+  davangerePostalCode: '577005',
+  davangereGoogleMapsUrl:
+    'https://www.google.com/maps/search/?api=1&query=Lokikere+Road+Shiramagondanahally+Hosabadavne+Davangere+Karnataka+577005',
 } as const;

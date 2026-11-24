@@ -152,16 +152,16 @@ export function HomePage() {
             id: 'davangere',
             name: 'MY CONCRETE – Davangere Unit',
             shortLabel: 'Davangere',
-            address: 'Davangere, Karnataka 577001',
+            address: CONTACT_CONFIG.davangereUnitAddress,
             city: 'Davangere',
-            postalCode: '577001',
+            postalCode: CONTACT_CONFIG.davangerePostalCode,
             lat: 14.4644,
             lng: 75.9218,
             phone: '+91 73378 07372',
             whatsapp: '+91 73378 07372',
             hours: 'Open 24 Hours (All Days)',
             serviceRadiusKm: 50,
-            googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+            googleMapsUrl: CONTACT_CONFIG.davangereGoogleMapsUrl,
             pinColor: 'red' as const,
             isPrimary: false,
           },
@@ -862,6 +862,116 @@ export function HomePage() {
                 </div>
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* E.6) RECENT SITE POURS & FLEET GALLERY (6 Newly Uploaded Real MY CONCRETE Photos) */}
+      <section aria-labelledby="site-pours-heading" className="bg-[var(--bg)] border-t border-[#D7E4FF]/70 dark:border-[#264096]/70">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-16 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#D92B25]">
+                Live Project Pours &amp; Transit Mixer Fleet
+              </p>
+              <h2
+                id="site-pours-heading"
+                className="font-display font-extrabold text-2xl sm:text-3xl text-[#0F1F5C] dark:text-white"
+              >
+                {lang === 'kn' ? 'ಸೈಟ್ ಪೋರಿಂಗ್ ಮತ್ತು ಮಿಕ್ಸರ್ ಫ್ಲೀಟ್ ಫೋಟೋಗಳು' : 'Recent Site Pours & Fleet Photos'}
+              </h2>
+              <p className="text-sm text-[var(--muted)]">
+                {lang === 'kn'
+                  ? 'ನಮ್ಮ ಭಾರತ್‌ಬೆಂಜ್ ಟ್ರಾನ್ಸಿಟ್ ಮಿಕ್ಸರ್‌ಗಳು, ಲೈನ್ ಪಂಪ್, ಸ್ಲ್ಯಾಬ್ ಮತ್ತು ಆರ್‌ಸಿಸಿ ಕಂಬಗಳ ಕಾಂಕ್ರೀಟ್ ಕೆಲಸದ ನೈಜ ಚಿತ್ರಗಳು.'
+                  : 'Genuine snapshots of our MY CONCRETE transit mixers, concrete line pumps, roof slab pours, and heavy RCC columns.'}
+              </p>
+            </div>
+            <Link
+              to="/gallery"
+              className="group inline-flex items-center gap-2 rounded-full border border-[#0F1F5C] dark:border-white/30 px-5 py-2 text-xs font-semibold text-[#0F1F5C] dark:text-white hover:bg-[#0F1F5C] hover:text-white transition-colors whitespace-nowrap self-start sm:self-auto"
+            >
+              <span>View Full Gallery</span>
+              <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {[
+              {
+                src: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.57_PM_4072ed6d.jpeg',
+                tag: 'Transit Mixer',
+                title: 'MY CONCRETE BharatBenz Mixer on Site',
+                titleKn: 'ಸೈಟ್‌ನಲ್ಲಿ MY CONCRETE ಟ್ರಾನ್ಸಿಟ್ ಮಿಕ್ಸರ್',
+                pos: 'center center',
+              },
+              {
+                src: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.57_PM__1__88f8065c.jpeg',
+                tag: 'Mixer + Line Pump',
+                title: 'Fleet KA 68 6266 & Concrete Line Pump',
+                titleKn: 'ಮಿಕ್ಸರ್ KA 68 6266 ಮತ್ತು ಲೈನ್ ಪಂಪ್',
+                pos: 'center center',
+              },
+              {
+                src: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.56_PM__1__9cc26c3b.jpeg',
+                tag: 'Slab Pouring',
+                title: 'Pump Pipeline Slab Placement Crew',
+                titleKn: 'ಪಂಪ್ ಪೈಪ್ ಮೂಲಕ ಸ್ಲ್ಯಾಬ್ ಕಾಂಕ್ರೀಟ್',
+                pos: 'center center',
+              },
+              {
+                src: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.56_PM_18ed585c.jpeg',
+                tag: 'Structural Rebar',
+                title: 'Multi-Bay Roof Slab Reinforcement Pour',
+                titleKn: 'ದಟ್ಟ ಕಬ್ಬಿಣದ ಜಾಲರಿಯ ಮೇಲೆ ಸ್ಲ್ಯಾಬ್ ಪೋರಿಂಗ್',
+                pos: 'center center',
+              },
+              {
+                src: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.56_PM__2__d421b70a.jpeg',
+                tag: 'Completed Slab',
+                title: 'Freshly Finished Residential Roof Slab',
+                titleKn: 'ಪೂರ್ಣಗೊಂಡ ಮನೆಯ ಛಾವಣಿ ಸ್ಲ್ಯಾಬ್',
+                pos: 'center center',
+              },
+              {
+                src: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.58_PM_56212efd.jpeg',
+                tag: 'RCC Column',
+                title: 'Heavy RCC Column Formwork & Pump Pour',
+                titleKn: 'ಆರ್‌ಸಿಸಿ ಕಂಬದ ಶಟರಿಂಗ್ ಮತ್ತು ಪಂಪ್ ಪೋರಿಂಗ್',
+                pos: 'center 35%',
+              },
+            ].map((photo) => (
+              <Link
+                key={photo.src}
+                to="/gallery"
+                className="group relative aspect-[4/3] rounded-[20px] overflow-hidden shadow-[0_14px_32px_-12px_rgba(15,31,92,0.18)] border border-[#D7E4FF] dark:border-[#264096] bg-[#0F1F5C]"
+              >
+                <img
+                  src={photo.src}
+                  alt={lang === 'kn' ? photo.titleKn : photo.title}
+                  width={960}
+                  height={720}
+                  loading="lazy"
+                  decoding="async"
+                  style={{ objectPosition: photo.pos }}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                />
+                <div
+                  className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0F1F5C]/90 via-[#0F1F5C]/45 to-transparent pointer-events-none"
+                  aria-hidden="true"
+                />
+                <div className="absolute inset-x-0 bottom-0 p-4 flex items-end justify-between gap-2">
+                  <div>
+                    <span className="inline-block text-[11px] font-semibold uppercase tracking-wider text-[#FFC93C] mb-0.5">
+                      {photo.tag}
+                    </span>
+                    <p className="font-display font-bold text-sm sm:text-base text-white leading-snug">
+                      {lang === 'kn' ? photo.titleKn : photo.title}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-white/90 shrink-0 transition-transform group-hover:translate-x-1" />
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

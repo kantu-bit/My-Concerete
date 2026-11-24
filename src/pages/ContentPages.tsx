@@ -135,11 +135,14 @@ export function MediaPage() {
             const isSlab = m.image_url.includes('slab-rebar');
             const isPoster = m.image_url.includes('brand-poster');
             const isBricksTall = m.image_url.includes('brick-stacks');
-            const isPortrait = isSilos || isSlab || isPoster || isBricksTall;
+            const isColumnPour = m.image_url.includes('3.54.58_PM_56212efd');
+            const isPortrait = isSilos || isSlab || isPoster || isBricksTall || isColumnPour;
             const objectPos = isSilos
               ? 'center 40%'
               : isSlab
               ? 'center 60%'
+              : isColumnPour
+              ? 'center 35%'
               : isPoster
               ? 'center top'
               : 'center';
@@ -336,16 +339,16 @@ export function ContactPage() {
               id: 'davangere',
               name: 'MY CONCRETE – Davangere Unit',
               shortLabel: 'Davangere',
-              address: 'Davangere, Karnataka 577001',
+              address: CONTACT_CONFIG.davangereUnitAddress,
               city: 'Davangere',
-              postalCode: '577001',
+              postalCode: CONTACT_CONFIG.davangerePostalCode,
               lat: 14.4644,
               lng: 75.9218,
               phone: '+91 73378 07372',
               whatsapp: '+91 73378 07372',
               hours: 'Open 24 Hours (All Days)',
               serviceRadiusKm: 50,
-              googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+              googleMapsUrl: CONTACT_CONFIG.davangereGoogleMapsUrl,
               pinColor: 'red' as const,
               isPrimary: false,
             },
@@ -567,8 +570,10 @@ export function ContactPage() {
               const locDirections =
                 loc.googleMapsUrl ||
                 `https://www.google.com/maps/dir/?api=1&destination=${loc.lat},${loc.lng}`;
+              const embedQuery =
+                loc.id === 'davangere' && loc.address ? loc.address : `${loc.lat},${loc.lng}`;
               const embedSrc = `https://maps.google.com/maps?q=${encodeURIComponent(
-                `${loc.lat},${loc.lng}`
+                embedQuery
               )}&z=14&output=embed`;
               return (
                 <div key={loc.id} className="warm-card overflow-hidden flex flex-col">

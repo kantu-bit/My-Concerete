@@ -879,9 +879,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </ul>
           </div>
 
-          <div className="space-y-3 text-sm text-slate-300">
+          <div className="space-y-2.5 text-sm text-slate-300">
             <h4 className="font-display font-semibold text-[#FFC93C] text-sm">Plant &amp; Corporate Contact</h4>
-            <p>{biz?.address}</p>
+            <p className="text-xs leading-relaxed">
+              <strong className="text-white">Kotihal Plant:</strong> {biz?.address}
+            </p>
+            <p className="text-xs text-slate-300/90 leading-relaxed">
+              <strong className="text-white">Davangere Unit:</strong>{' '}
+              {CONTACT_CONFIG.davangereUnitAddress}
+            </p>
             <p className="text-xs text-slate-300/90 leading-relaxed">
               <strong className="text-white">Corporate Office:</strong>{' '}
               {CONTACT_CONFIG.corporateOfficeAddress}

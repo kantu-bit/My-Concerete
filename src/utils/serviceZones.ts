@@ -183,7 +183,7 @@ export const SERVICE_ZONE_INFO: Record<'kotihal' | 'davangere', ServiceZoneToolt
   davangere: {
     id: 'davangere',
     zoneName: 'Davangere – Harihar Zone',
-    plantLabel: 'Davangere Dispatch Unit',
+    plantLabel: 'Davangere Unit · Lokikere Road, Shiramagondanahally Hosabadavne, 577005',
     color: '#D92B25',
     deliveryTimeframe: '45 – 75 mins ETA (2-hr Dispatch Windows)',
     slotWindowNote: 'Priority Smart City & Industrial Estate dispatch 24/7',

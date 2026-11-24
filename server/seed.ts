@@ -60,16 +60,17 @@ export const DEFAULT_PLANT_LOCATIONS = [
     id: 'davangere',
     name: 'MY CONCRETE – Davangere Unit',
     shortLabel: 'Davangere',
-    address: 'Davangere, Karnataka 577001',
+    address: 'Lokikere Road, Shiramagondanahally Hosabadavne, Davangere, Karnataka 577005',
     city: 'Davangere',
-    postalCode: '577001',
+    postalCode: '577005',
     lat: 14.4644,
     lng: 75.9218,
     phone: '+91 73378 07372',
     whatsapp: '+91 73378 07372',
     hours: 'Open 24 Hours (All Days)',
     serviceRadiusKm: 50,
-    googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=14.4644,75.9218',
+    googleMapsUrl:
+      'https://www.google.com/maps/search/?api=1&query=Lokikere+Road+Shiramagondanahally+Hosabadavne+Davangere+Karnataka+577005',
     pinColor: 'red' as const,
     isPrimary: false,
   },
@@ -1348,6 +1349,43 @@ export function seedDatabase(): void {
   insertSetting.run('businessConfig', JSON.stringify(DEFAULT_BUSINESS_CONFIG));
   insertSetting.run('plantLocations', JSON.stringify(DEFAULT_PLANT_LOCATIONS));
   insertSetting.run('schedulingConfig', JSON.stringify(DEFAULT_SCHEDULING_CONFIG));
+
+  // Migrate existing Davangere unit placeholder address ('Davangere, Karnataka 577001') to full Lokikere Road address
+  try {
+    const existingLocRow = db
+      .prepare(`SELECT value FROM settings WHERE key = 'plantLocations'`)
+      .get() as { value: string } | undefined;
+    if (existingLocRow?.value) {
+      const parsed = JSON.parse(existingLocRow.value) as Array<Record<string, unknown>>;
+      if (Array.isArray(parsed)) {
+        let changed = false;
+        const updated = parsed.map((loc) => {
+          if (
+            loc &&
+            loc.id === 'davangere' &&
+            (loc.address === 'Davangere, Karnataka 577001' || loc.postalCode === '577001')
+          ) {
+            changed = true;
+            return {
+              ...loc,
+              address: 'Lokikere Road, Shiramagondanahally Hosabadavne, Davangere, Karnataka 577005',
+              postalCode: '577005',
+              googleMapsUrl:
+                'https://www.google.com/maps/search/?api=1&query=Lokikere+Road+Shiramagondanahally+Hosabadavne+Davangere+Karnataka+577005',
+            };
+          }
+          return loc;
+        });
+        if (changed) {
+          db.prepare(`UPDATE settings SET value = ? WHERE key = 'plantLocations'`).run(
+            JSON.stringify(updated)
+          );
+        }
+      }
+    }
+  } catch {
+    // Non-fatal migration guard
+  }
   insertSetting.run('heroSlides', JSON.stringify(DEFAULT_HERO_SLIDES));
   insertSetting.run('statsItems', JSON.stringify(DEFAULT_STATS));
   insertSetting.run('customerPages', JSON.stringify(DEFAULT_CUSTOMER_PAGES));
@@ -1582,6 +1620,60 @@ export function seedDatabase(): void {
       image_url: '/images/home/brand-poster.webp',
       published_date: '2026-11-01',
       sort_order: 6,
+    },
+    {
+      title: 'Pump Pipeline Roof Slab Pour in Progress',
+      category: 'Project Sites',
+      caption:
+        'Crew placing and levelling freshly pumped ready-mix concrete across residential roof reinforcement mesh. | ಮನೆ ಸ್ಲ್ಯಾಬ್ ಕಬ್ಬಿಣದ ಜಾಲರಿಯ ಮೇಲೆ ಪಂಪ್ ಪೈಪ್‌ಲೈನ್ ಮೂಲಕ ರೆಡಿ-ಮಿಕ್ಸ್ ಕಾಂಕ್ರೀಟ್ ಹಾಕುತ್ತಿರುವ ದೃಶ್ಯ.',
+      image_url: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.56_PM__1__9cc26c3b.jpeg',
+      published_date: '2026-11-24',
+      sort_order: 7,
+    },
+    {
+      title: 'Freshly Finished Residential Roof Slab',
+      category: 'Project Sites',
+      caption:
+        'Clean, dense roof slab poured and finished on schedule for a residential home project. | ನಿಗದಿತ ಸಮಯಕ್ಕೆ ಸರಿಯಾಗಿ ಮತ್ತು ನುಣುಪಾಗಿ ಪೂರ್ಣಗೊಂಡ ಮನೆಯ ಛಾವಣಿ ಸ್ಲ್ಯಾಬ್ ಕಾಂಕ್ರೀಟ್.',
+      image_url: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.56_PM__2__d421b70a.jpeg',
+      published_date: '2026-11-24',
+      sort_order: 8,
+    },
+    {
+      title: 'Multi-Bay Slab Reinforcement & Line Pump Team',
+      category: 'Project Sites',
+      caption:
+        'Safety-geared placement team directing line-pump discharge evenly across multi-bay structural rebar grids. | ಸುರಕ್ಷತಾ ಕಿಟ್‌ಗಳೊಂದಿಗೆ ದಟ್ಟವಾದ ಸ್ಲ್ಯಾಬ್ ಕಬ್ಬಿಣದ ಮೇಲೆ ಪಂಪ್ ಕಾಂಕ್ರೀಟ್ ಹರಡುತ್ತಿರುವ ತಂಡ.',
+      image_url: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.56_PM_18ed585c.jpeg',
+      published_date: '2026-11-24',
+      sort_order: 9,
+    },
+    {
+      title: 'MY CONCRETE BharatBenz Transit Mixer on Site',
+      category: 'Transit Mixers',
+      caption:
+        'Side profile of our MY CONCRETE transit mixer positioned at a project site for fresh concrete discharge. | ಸೈಟ್‌ನಲ್ಲಿ ರೆಡಿ-ಮಿಕ್ಸ್ ಕಾಂಕ್ರೀಟ್ ಇಳಿಸಲು ಸಜ್ಜಾಗಿ ನಿಂತಿರುವ MY CONCRETE ಭಾರತ್‌ಬೆಂಜ್ ಟ್ರಾನ್ಸಿಟ್ ಮಿಕ್ಸರ್.',
+      image_url: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.57_PM_4072ed6d.jpeg',
+      published_date: '2026-11-24',
+      sort_order: 10,
+    },
+    {
+      title: 'Transit Mixer & Concrete Line Pump Setup (KA 68 6266)',
+      category: 'Transit Mixers',
+      caption:
+        'MY CONCRETE transit mixer (KA 68 6266) paired with mobile concrete line pump for elevated slab pours. | ಎತ್ತರದ ಸ್ಲ್ಯಾಬ್ ಪಂಪಿಂಗ್‌ಗಾಗಿ ಲೈನ್ ಪಂಪ್ ಜೊತೆಗೂಡಿ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿರುವ MY CONCRETE ಮಿಕ್ಸರ್ (KA 68 6266).',
+      image_url: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.57_PM__1__88f8065c.jpeg',
+      published_date: '2026-11-24',
+      sort_order: 11,
+    },
+    {
+      title: 'Heavy Structural RCC Column Pouring',
+      category: 'Project Sites',
+      caption:
+        'Vertical reinforcement cage and column formwork filled with freshly batched structural concrete via delivery pipe. | ಬಲಿಷ್ಠ ಆರ್‌ಸಿಸಿ ಕಂಬದ ಶಟರಿಂಗ್ ಒಳಗೆ ಪೈಪ್‌ಲೈನ್ ಮೂಲಕ ತಾಜಾ ಕಾಂಕ್ರೀಟ್ ತುಂಬುತ್ತಿರುವ ದೃಶ್ಯ.',
+      image_url: '/assets/aistudio/WhatsApp_Image_2026-11-24_at_3.54.58_PM_56212efd.jpeg',
+      published_date: '2026-11-24',
+      sort_order: 12,
     },
   ];
   for (const item of REAL_MEDIA_ITEMS) {
