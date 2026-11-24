@@ -8,6 +8,7 @@ import {
   DAVANGERE_ZONE_POLYGON,
   RANEBENNUR_ZONE_POLYGON,
   SERVICE_TOWN_PRESETS,
+  SERVICE_ZONE_INFO,
   evaluateDeliveryFeasibility,
   type ZoneFocus,
 } from '../utils/serviceZones.ts';
@@ -28,6 +29,11 @@ interface PlantMapProps {
   zoneFocus?: ZoneFocus;
   checkedSite?: { lat: number; lng: number; label?: string } | null;
   onCheckSite?: (lat: number, lng: number, label?: string) => void;
+  deliveryFees?: {
+    baseDeliveryFee?: number;
+    perKmRate?: number;
+    freeRadiusKm?: number;
+  };
   googleMapsUrl?: string;
   heightClass?: string;
 }
@@ -63,6 +69,7 @@ export function PlantMap({
   zoneFocus = 'all',
   checkedSite,
   onCheckSite,
+  deliveryFees,
   googleMapsUrl,
   heightClass = 'h-80',
 }: PlantMapProps) {
@@ -72,6 +79,9 @@ export function PlantMap({
   const siteMarkerRef = useRef<L.CircleMarker | null>(null);
   const feasibilityLayerRef = useRef<L.LayerGroup | null>(null);
   const zoneOverlayLayerRef = useRef<L.LayerGroup | null>(null);
+  const ranebennurPolyRef = useRef<L.Polygon | null>(null);
+  const davangerePolyRef = useRef<L.Polygon | null>(null);
+  const suppressSitePopupRef = useRef(false);
   const onCheckSiteRef = useRef(onCheckSite);
   onCheckSiteRef.current = onCheckSite;
 
@@ -221,6 +231,19 @@ export function PlantMap({
           }
         });
       });
+      const zoneCheckBtns = popupEl.querySelectorAll<HTMLButtonElement>('.mc-zone-check-btn');
+      zoneCheckBtns.forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          const lat = Number(btn.getAttribute('data-lat'));
+          const lng = Number(btn.getAttribute('data-lng'));
+          const label = btn.getAttribute('data-label') || 'Zone Site';
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            suppressSitePopupRef.current = false;
+            onCheckSiteRef.current?.(lat, lng, label);
+          }
+        });
+      });
       const telLinks = popupEl.querySelectorAll<HTMLAnchorElement>('.mc-popup-tel-link');
       telLinks.forEach((link) => {
         link.addEventListener('click', (e) => {
@@ -306,28 +329,65 @@ export function PlantMap({
 
     const showKotihal = zoneFocus === 'all' || zoneFocus === 'kotihal';
     const showDavangere = zoneFocus === 'all' || zoneFocus === 'davangere';
+    const freeKm = deliveryFees?.freeRadiusKm ?? 5;
+    const perKm = deliveryFees?.perKmRate ?? 110;
+    const baseFee = deliveryFees?.baseDeliveryFee ?? 1500;
 
-    // 1. Primary corridor polygons
+    const buildZonePopupHtml = (
+      zoneId: 'kotihal' | 'davangere',
+      clickLat: number,
+      clickLng: number
+    ) => {
+      const info = SERVICE_ZONE_INFO[zoneId];
+      const extendedExtra = zoneId === 'kotihal' ? '+₹250/m³ (>32 km)' : '+₹350/m³ (>32 km)';
+      return `<div style="font-family:sans-serif;font-size:12px;line-height:1.45;min-width:235px;max-width:275px;">
+        <div style="display:inline-block;background:${info.color};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-bottom:5px;">${escapeHtml(info.zoneName)}</div>
+        <div style="font-weight:700;color:#0F1F5C;font-size:13px;margin-bottom:4px;">${escapeHtml(info.plantLabel)}</div>
+        <div style="background:#F4F8FF;border:1px solid #D7E4FF;border-radius:8px;padding:7px 9px;margin-bottom:6px;">
+          <div style="font-size:11px;font-weight:700;color:#0F1F5C;">&#9201; Expected Delivery Timeframe</div>
+          <div style="font-size:12px;font-weight:700;color:#059669;margin-top:1px;">${escapeHtml(info.deliveryTimeframe)}</div>
+          <div style="font-size:11px;color:#475569;margin-top:1px;">${escapeHtml(info.slotWindowNote)}</div>
+        </div>
+        <div style="background:#FFF8EB;border:1px solid #FDE68A;border-radius:8px;padding:7px 9px;margin-bottom:6px;">
+          <div style="font-size:11px;font-weight:700;color:#0F1F5C;">&#8377; Zone-Specific Surcharges</div>
+          <div style="font-size:11px;color:#334155;margin-top:2px;">&bull; 0&ndash;${freeKm} km Core: <strong>&#8377;0 surcharge</strong> (Base &#8377;${baseFee.toLocaleString('en-IN')})</div>
+          <div style="font-size:11px;color:#334155;">&bull; ${freeKm}&ndash;32 km Zone: <strong>&#8377;${perKm}/km</strong></div>
+          <div style="font-size:11px;color:#B91C1C;">&bull; Extended 32&ndash;50 km: <strong>${extendedExtra}</strong></div>
+          <div style="font-size:11px;color:#059669;">&bull; Night Slots (8 PM&ndash;6 AM): <strong>&#8377;0 extra</strong></div>
+        </div>
+        <div style="font-size:11px;color:#475569;margin-bottom:7px;"><strong>Covers:</strong> ${escapeHtml(info.coveredTowns)}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;padding-top:6px;border-top:1px solid #E2E8F0;">
+          <button type="button" data-lat="${clickLat}" data-lng="${clickLng}" data-label="${escapeHtml(info.zoneName)}" class="mc-zone-check-btn" style="cursor:pointer;padding:5px 9px;border-radius:8px;border:1px solid #CBD5E1;background:#FFFFFF;color:#0F1F5C;font-weight:600;font-size:11px;">Check Pin Here</button>
+          <a href="/book?plant=${encodeURIComponent(zoneId)}" data-book-plant="${encodeURIComponent(zoneId)}" class="mc-popup-book-link" style="display:inline-block;padding:5px 10px;border-radius:8px;background:#D92B25;color:#FFFFFF;font-weight:700;font-size:11px;text-decoration:none;">Book in Zone</a>
+        </div>
+      </div>`;
+    };
+
+    // 1. Primary corridor polygons with clickable zone tooltips
     const ranebennurPoly = L.polygon(RANEBENNUR_ZONE_POLYGON, {
       color: '#1F3FA8',
       weight: zoneFocus === 'kotihal' ? 2.5 : 1.5,
       dashArray: zoneFocus === 'kotihal' ? undefined : '4 4',
       fillColor: '#1F3FA8',
-      fillOpacity: showKotihal ? (zoneFocus === 'kotihal' ? 0.16 : 0.1) : 0.02,
+      fillOpacity: showKotihal ? (zoneFocus === 'kotihal' ? 0.18 : 0.11) : 0.02,
       interactive: true,
     }).addTo(zoneLayer);
+    ranebennurPolyRef.current = ranebennurPoly;
     ranebennurPoly.bindTooltip(
-      '<strong>Ranebennur – Kotihal Primary Service Zone</strong><br/>Express &amp; Standard 2-hr RMC Dispatch',
+      `<strong>Ranebennur – Kotihal Zone</strong><br/>ETA: 30–60 mins · Tap zone for surcharge details`,
       { sticky: true }
     );
+    ranebennurPoly.bindPopup(buildZonePopupHtml('kotihal', 14.6197, 75.6295), { maxWidth: 290 });
     ranebennurPoly.on('click', (evt: L.LeafletMouseEvent) => {
-      if (!onCheckSiteRef.current) return;
       L.DomEvent.stopPropagation(evt);
       const { lat, lng } = evt.latlng;
-      onCheckSiteRef.current(
+      suppressSitePopupRef.current = true;
+      ranebennurPoly.setPopupContent(buildZonePopupHtml('kotihal', Number(lat.toFixed(5)), Number(lng.toFixed(5))));
+      ranebennurPoly.openPopup(evt.latlng);
+      onCheckSiteRef.current?.(
         Number(lat.toFixed(5)),
         Number(lng.toFixed(5)),
-        `Pinned Site (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        `Ranebennur Zone (${lat.toFixed(3)}, ${lng.toFixed(3)})`
       );
     });
 
@@ -336,21 +396,25 @@ export function PlantMap({
       weight: zoneFocus === 'davangere' ? 2.5 : 1.5,
       dashArray: zoneFocus === 'davangere' ? undefined : '4 4',
       fillColor: '#D92B25',
-      fillOpacity: showDavangere ? (zoneFocus === 'davangere' ? 0.15 : 0.09) : 0.02,
+      fillOpacity: showDavangere ? (zoneFocus === 'davangere' ? 0.17 : 0.1) : 0.02,
       interactive: true,
     }).addTo(zoneLayer);
+    davangerePolyRef.current = davangerePoly;
     davangerePoly.bindTooltip(
-      '<strong>Davangere Primary Service Zone</strong><br/>Smart City, Harihar &amp; Karur Industrial Dispatch',
+      `<strong>Davangere – Harihar Zone</strong><br/>ETA: 45–75 mins · Tap zone for surcharge details`,
       { sticky: true }
     );
+    davangerePoly.bindPopup(buildZonePopupHtml('davangere', 14.4644, 75.9218), { maxWidth: 290 });
     davangerePoly.on('click', (evt: L.LeafletMouseEvent) => {
-      if (!onCheckSiteRef.current) return;
       L.DomEvent.stopPropagation(evt);
       const { lat, lng } = evt.latlng;
-      onCheckSiteRef.current(
+      suppressSitePopupRef.current = true;
+      davangerePoly.setPopupContent(buildZonePopupHtml('davangere', Number(lat.toFixed(5)), Number(lng.toFixed(5))));
+      davangerePoly.openPopup(evt.latlng);
+      onCheckSiteRef.current?.(
         Number(lat.toFixed(5)),
         Number(lng.toFixed(5)),
-        `Pinned Site (${lat.toFixed(4)}, ${lng.toFixed(4)})`
+        `Davangere Zone (${lat.toFixed(3)}, ${lng.toFixed(3)})`
       );
     });
 
@@ -415,7 +479,7 @@ export function PlantMap({
         );
       }
     }
-  }, [renderZones, zoneFocus, effectiveLocations]);
+  }, [renderZones, zoneFocus, effectiveLocations, deliveryFees]);
 
   // Smoothly frame map when zoneFocus changes (unless user just pinned a custom site)
   useEffect(() => {
@@ -498,7 +562,11 @@ export function PlantMap({
       </div>`,
       { maxWidth: 250 }
     );
-    sitePin.openPopup();
+    if (suppressSitePopupRef.current) {
+      suppressSitePopupRef.current = false;
+    } else {
+      sitePin.openPopup();
+    }
   }, [checkedSite, effectiveLocations]);
 
   useEffect(() => {
@@ -516,6 +584,26 @@ export function PlantMap({
         ref={containerRef}
         className={`w-full rounded-[20px] overflow-hidden border border-[#D7E4FF] dark:border-[#264096] ${heightClass}`}
       />
+      {renderZones && (
+        <div className="absolute top-3 right-3 z-[400] flex flex-wrap items-center justify-end gap-1.5 max-w-[82%] pointer-events-none">
+          <button
+            type="button"
+            onClick={() => ranebennurPolyRef.current?.openPopup()}
+            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-[#0F1F5C]/95 border border-[#1F3FA8]/40 dark:border-[#FFC93C]/50 px-3 py-1.5 text-[11px] font-bold text-[#1F3FA8] dark:text-[#FFC93C] shadow-md hover:bg-[#1F3FA8] hover:text-white transition-colors cursor-pointer"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#1F3FA8] shrink-0" />
+            <span>Ranebennur Zone Info</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => davangerePolyRef.current?.openPopup()}
+            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-white/95 dark:bg-[#0F1F5C]/95 border border-[#D92B25]/45 px-3 py-1.5 text-[11px] font-bold text-[#D92B25] dark:text-red-300 shadow-md hover:bg-[#D92B25] hover:text-white transition-colors cursor-pointer"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#D92B25] shrink-0" />
+            <span>Davangere Zone Info</span>
+          </button>
+        </div>
+      )}
       {safeExternalMapsUrl && !selectable && (!locations || locations.length <= 1) && (
         <a
           href={safeExternalMapsUrl}

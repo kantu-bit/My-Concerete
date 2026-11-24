@@ -1,35 +1,26 @@
-import { useState } from 'react';
-
 interface BrandLogoProps {
   onWhitePlate?: boolean;
   compact?: boolean;
   plateSize?: 'topbar' | 'compact';
 }
 
+const OFFICIAL_LOGO_SRC = '/assets/aistudio/IMG-20240728-WA0001.jpg_b56d6148.jpeg';
+
 export function BrandLogo({
   onWhitePlate = false,
   compact = false,
   plateSize = 'compact',
 }: BrandLogoProps) {
-  const [jpegMissing, setJpegMissing] = useState(false);
-
   const imgHeightClass =
     plateSize === 'topbar'
       ? 'h-12 w-auto object-contain'
       : compact
-      ? 'h-8 w-auto object-contain'
+      ? 'h-9 w-auto object-contain'
       : 'h-11 w-auto object-contain';
 
-  const inner = !jpegMissing ? (
+  const inner = (
     <img
-      src="/logo.jpeg"
-      alt="MY CONCRETE – Readymix Concrete Unit"
-      onError={() => setJpegMissing(true)}
-      className={imgHeightClass}
-    />
-  ) : (
-    <img
-      src="/logo.svg"
+      src={OFFICIAL_LOGO_SRC}
       alt="MY CONCRETE – Readymix Concrete Unit"
       className={imgHeightClass}
     />

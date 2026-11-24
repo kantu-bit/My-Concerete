@@ -10,6 +10,7 @@ import { CallLink, CopyPhoneButton, MailLink } from '../components/ContactLinks.
 import { buildWhatsAppUrl } from '../utils/documents.ts';
 import { CONTACT_CONFIG } from '../config/contact.ts';
 import { CompletedProjectsCarousel } from '../components/CompletedProjectsCarousel.tsx';
+import { FieldVideosGrid } from '../components/FieldVideosGrid.tsx';
 
 export function PartnerPage() {
   useDocumentMeta({
@@ -180,48 +181,10 @@ export function MediaPage() {
         </div>
       )}
 
-      {/* Real Site Concrete Pour Video Showcase */}
-      <section className="warm-card p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-        <div className="lg:col-span-5 flex justify-center">
-          <div className="w-full max-w-[300px] aspect-[9/16] rounded-[18px] overflow-hidden bg-[#0F1F5C] shadow-lg border border-[#D7E4FF] dark:border-[#264096]">
-            <video
-              controls
-              playsInline
-              preload="metadata"
-              poster="/images/home/mixer-plant-card.webp"
-              className="w-full h-full object-cover"
-            >
-              <source src="/assets/aistudio/VID-20260718-WA0008_47e83764.mp4" type="video/mp4" />
-              Your browser does not support video playback.
-            </video>
-          </div>
-        </div>
-        <div className="lg:col-span-7 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[#D92B25]">
-            Live Site Pour Footage
-          </p>
-          <h2 className="font-display font-bold text-2xl text-[#0F1F5C] dark:text-white">
-            On-Site Road &amp; Slab Concrete Placement
-          </h2>
-          <p className="text-sm text-[var(--muted)] leading-relaxed">
-            Continuous ready-mix discharge from our Kotihal transit mixer crew directly into prepared road formwork across our Ranebennur &amp; Davangere delivery corridor.
-          </p>
-          <p className="text-xs text-[var(--muted)]">
-            ರಾಣೆಬೆನ್ನೂರು ಮತ್ತು ದಾವಣಗೆರೆ ವ್ಯಾಪ್ತಿಯಲ್ಲಿ ರಸ್ತೆ ಮತ್ತು ಸ್ಲ್ಯಾಬ್ ಕಾಮಗಾರಿಗೆ MY CONCRETE ಟ್ರಾನ್ಸಿಟ್ ಮಿಕ್ಸರ್‌ನಿಂದ ನೇರ ಕಾಂಕ್ರೀಟ್ ಪೂರೈಕೆ.
-          </p>
-          <div className="pt-2 flex flex-wrap gap-3">
-            <Link to="/book" className="btn-orange-pill px-5 py-2.5 text-xs">
-              Book Transit Mixer Slot
-            </Link>
-            <Link
-              to="/quote"
-              className="rounded-full border border-[#D7E4FF] dark:border-[#264096] px-5 py-2.5 text-xs font-semibold hover:border-[#D92B25]"
-            >
-              Request Custom Quote
-            </Link>
-          </div>
-        </div>
-      </section>
+      {/* Real Site & Fleet Pour Video Reels (All 6 Videos) */}
+      <div id="videos-showcase">
+        <FieldVideosGrid sectionTitle="Plant, Transit Mixer &amp; Site Pour Videos" />
+      </div>
       </div>
 
       <CompletedProjectsCarousel projects={data?.projects || []} sectionId="gallery-completed-projects" />
@@ -726,7 +689,7 @@ export function OwnerGuidePage() {
 
   const remaining = [
     'Enter your exact per-m³ concrete rates and per-piece cement brick/block rates (plus delivery/pump charges) inside Admin > Products & Rates and Plant Config.',
-    'Optionally upload your original logo file to /public/logo.jpeg (transparent PNG/SVG supported) and real photographs of your Kotihal plant, mixers, bricks yard, and completed sites in Admin > CMS & Gallery.',
+    'Add or update additional photographs of your Kotihal plant, mixers, bricks yard, and completed sites anytime in Admin > CMS & Gallery.',
     'Optionally confirm founding year, plant capacity (m³/hr), mixer count, and pump count in Admin > Plant & Stats (hidden cleanly until entered).',
     'Set a strong ADMIN_PASSWORD, JWT_SECRET, and SMTP_* email credentials in your deployment environment variables.',
   ];

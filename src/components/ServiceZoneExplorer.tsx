@@ -14,6 +14,7 @@ import type { BusinessConfig, PlantLocation } from '../types/index.ts';
 import { PlantMap } from './PlantMap.tsx';
 import {
   SERVICE_TOWN_PRESETS,
+  SERVICE_ZONE_INFO,
   evaluateDeliveryFeasibility,
   type ZoneFocus,
 } from '../utils/serviceZones.ts';
@@ -239,6 +240,11 @@ export function ServiceZoneExplorer({
             onCheckSite={(lat, lng, label) =>
               setCheckedSite({ lat, lng, label: label || `${lat.toFixed(4)}, ${lng.toFixed(4)}` })
             }
+            deliveryFees={{
+              baseDeliveryFee: biz.baseDeliveryFee,
+              perKmRate: biz.perKmRate,
+              freeRadiusKm: biz.freeRadiusKm,
+            }}
             googleMapsUrl={biz.googleMapsUrl}
             heightClass={mapHeightClass}
           />
@@ -322,6 +328,22 @@ export function ServiceZoneExplorer({
                   </p>
                 </div>
               </div>
+
+              {/* Zone Timeframe & Surcharge Summary */}
+              {(() => {
+                const activeZoneKey =
+                  evaluation.nearest.plant.id === 'davangere' ? 'davangere' : 'kotihal';
+                const zInfo = SERVICE_ZONE_INFO[activeZoneKey];
+                return (
+                  <div className="rounded-xl bg-[#F4F8FF] dark:bg-[#0F1F5C]/70 border border-[#D7E4FF] dark:border-[#264096] p-3 space-y-1 text-xs">
+                    <p className="font-semibold text-[#0F1F5C] dark:text-[#FFC93C]">
+                      {zInfo.zoneName} · {zInfo.deliveryTimeframe}
+                    </p>
+                    <p className="text-[var(--muted)]">{zInfo.coreSurcharge}</p>
+                    <p className="text-[var(--muted)]">{zInfo.extendedSurcharge}</p>
+                  </div>
+                );
+              })()}
 
               {/* Dual-Plant Comparison */}
               <div className="space-y-2 pt-2 border-t border-[#EAF1FF] dark:border-[#264096]">

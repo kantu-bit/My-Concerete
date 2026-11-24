@@ -32,6 +32,7 @@ import { WaveDivider } from '../components/WaveDivider.tsx';
 import { ServiceZoneExplorer } from '../components/ServiceZoneExplorer.tsx';
 import { CONTACT_CONFIG } from '../config/contact.ts';
 import { CompletedProjectsCarousel } from '../components/CompletedProjectsCarousel.tsx';
+import { FieldVideosGrid } from '../components/FieldVideosGrid.tsx';
 
 function splitHeadlineLines(text: string, maxCharsPerLine = 22): string[] {
   const words = text.trim().split(/\s+/).filter(Boolean);
@@ -864,6 +865,13 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* E.7) FLEET & SITE POUR REELS: Real Uploaded MY CONCRETE Videos */}
+      <FieldVideosGrid
+        limit={6}
+        showViewAllButton
+        sectionTitle="Watch Our Fleet & Pours in Action"
+      />
 
       {/* F) REAL-TIME DELIVERY STATUS INDICATOR & LIVE DISPATCH DEMAND */}
       <DeliveryStatusWidget />

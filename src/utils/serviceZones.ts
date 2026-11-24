@@ -154,6 +154,46 @@ export const DAVANGERE_ZONE_POLYGON: Array<[number, number]> = [
   [14.33, 75.78], // West Tungabhadra corridor
 ];
 
+export interface ServiceZoneTooltipInfo {
+  id: 'kotihal' | 'davangere';
+  zoneName: string;
+  plantLabel: string;
+  color: string;
+  deliveryTimeframe: string;
+  slotWindowNote: string;
+  coreSurcharge: string;
+  extendedSurcharge: string;
+  nightSurcharge: string;
+  coveredTowns: string;
+}
+
+export const SERVICE_ZONE_INFO: Record<'kotihal' | 'davangere', ServiceZoneTooltipInfo> = {
+  kotihal: {
+    id: 'kotihal',
+    zoneName: 'Ranebennur – Kotihal Zone',
+    plantLabel: 'Kotihal Main Batching Unit',
+    color: '#1F3FA8',
+    deliveryTimeframe: '30 – 60 mins ETA (2-hr Dispatch Windows)',
+    slotWindowNote: 'Same-day & overnight slots available 24/7',
+    coreSurcharge: '₹0 Zone Surcharge within 5 km Kotihal core',
+    extendedSurcharge: '₹110/km beyond 5 km · +₹250/m³ beyond 32 km',
+    nightSurcharge: '₹0 extra night-slot surcharge (8 PM – 6 AM)',
+    coveredTowns: 'Kotihal, Ranebennur, Halageri, Byadgi, Haveri',
+  },
+  davangere: {
+    id: 'davangere',
+    zoneName: 'Davangere – Harihar Zone',
+    plantLabel: 'Davangere Dispatch Unit',
+    color: '#D92B25',
+    deliveryTimeframe: '45 – 75 mins ETA (2-hr Dispatch Windows)',
+    slotWindowNote: 'Priority Smart City & Industrial Estate dispatch 24/7',
+    coreSurcharge: '₹0 Zone Surcharge within 5 km Davangere core',
+    extendedSurcharge: '₹110/km beyond 5 km · +₹350/m³ corridor surcharge (>32 km)',
+    nightSurcharge: '₹0 extra night-slot surcharge (recommended for NH-48 bypass pours)',
+    coveredTowns: 'Davangere City, Harihar, Karur Industrial Area, Honnali',
+  },
+};
+
 const EARTH_RADIUS_KM = 6371;
 const ROAD_TORTUOSITY_FACTOR = 1.22;
 const AVG_MIXER_SPEED_KMH = 34;
