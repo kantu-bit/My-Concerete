@@ -57,6 +57,7 @@ export function setAdminSessionCookie(req: Request, res: Response, rawToken: str
     httpOnly: true,
     secure: https,
     sameSite: https ? 'none' : 'lax',
+    partitioned: https,
     path: '/',
     maxAge: SESSION_MAX_MS,
   });
@@ -68,6 +69,7 @@ export function clearAdminSessionCookie(req: Request, res: Response): void {
     httpOnly: true,
     secure: https,
     sameSite: https ? 'none' : 'lax',
+    partitioned: https,
     path: '/',
   });
 }
@@ -178,6 +180,26 @@ export interface AdminSessionUser {
 export type AuthedRequest = Request & { admin?: AdminSessionUser };
 
 export function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction): void {
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method.toUpperCase())) {
+    const originHeader = req.headers.origin;
+    if (originHeader) {
+      try {
+        const originHost = new URL(originHeader).host.toLowerCase();
+        const rawHost = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+          .split(',')[0]
+          .trim()
+          .toLowerCase();
+        if (rawHost && originHost !== rawHost) {
+          res.status(403).json({ error: 'Cross-origin request rejected.' });
+          return;
+        }
+      } catch {
+        res.status(403).json({ error: 'Invalid request origin.' });
+        return;
+      }
+    }
+  }
+
   const cookies = parseCookies(req);
   const rawToken = cookies[ADMIN_COOKIE_NAME] || '';
   if (!rawToken) {

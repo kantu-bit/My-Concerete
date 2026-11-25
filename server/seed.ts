@@ -1755,15 +1755,14 @@ export function seedDatabase(): void {
     if (!existingAdmin) {
       const hash = bcrypt.hashSync(adminPass, 12);
       db.prepare(
-        `INSERT INTO admin_users (email, name, password_hash, role, must_change_password) VALUES (?, 'Owner', ?, 'owner', 1)`
+        `INSERT INTO admin_users (email, name, password_hash, role, must_change_password) VALUES (?, 'Owner', ?, 'owner', 0)`
       ).run(adminEmail, hash);
-    } else if (
-      existingAdmin.must_change_password === 1 &&
-      !existingAdmin.last_login_at &&
-      !bcrypt.compareSync(adminPass, existingAdmin.password_hash)
-    ) {
+    } else if (!bcrypt.compareSync(adminPass, existingAdmin.password_hash)) {
       const hash = bcrypt.hashSync(adminPass, 12);
-      db.prepare(`UPDATE admin_users SET password_hash = ? WHERE id = ?`).run(hash, existingAdmin.id);
+      db.prepare(`UPDATE admin_users SET password_hash = ?, role = 'owner', must_change_password = 0 WHERE id = ?`).run(
+        hash,
+        existingAdmin.id
+      );
     }
   }
 }

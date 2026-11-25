@@ -232,11 +232,17 @@ export function AdminDashboardPage({
 
   const [authChecked, setAuthChecked] = useState(false);
   const [authConfigured, setAuthConfigured] = useState<boolean | null>(null);
+  const [emailConfigured, setEmailConfigured] = useState<boolean>(true);
   const [admin, setAdmin] = useState<AdminSessionProfile | null>(null);
 
   const [authView, setAuthView] = useState<'signin' | 'otp' | 'forgot' | 'reset'>(
     resetTokenFromUrl ? 'reset' : 'signin'
   );
+  const [setupName, setSetupName] = useState('Owner');
+  const [setupEmail, setSetupEmail] = useState('myconcretektl@gmail.com');
+  const [setupPassword, setSetupPassword] = useState('');
+  const [setupConfirmPassword, setSetupConfirmPassword] = useState('');
+
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -464,17 +470,30 @@ export function AdminDashboardPage({
 
   const checkSession = useCallback(async () => {
     try {
-      const [statusRes, meRes] = await Promise.all([
-        fetch('/api/admin/auth-status'),
-        fetch('/api/admin/me', { credentials: 'include' }),
-      ]);
+      const statusRes = await fetch('/api/admin/auth-status', { credentials: 'include' });
+      let hasSession = false;
       if (statusRes.ok) {
-        const { data: sJson } = await parseJsonResponse<{ configured: boolean }>(statusRes);
-        if (sJson) setAuthConfigured(Boolean(sJson.configured));
+        const { data: sJson } = await parseJsonResponse<{
+          configured: boolean;
+          emailConfigured?: boolean;
+          authenticated?: boolean;
+        }>(statusRes);
+        if (sJson) {
+          setAuthConfigured(Boolean(sJson.configured));
+          if (typeof sJson.emailConfigured === 'boolean') {
+            setEmailConfigured(sJson.emailConfigured);
+          }
+          hasSession = Boolean(sJson.authenticated);
+        }
       }
-      if (meRes.ok) {
-        const { data: meJson } = await parseJsonResponse<{ admin: AdminSessionProfile }>(meRes);
-        setAdmin(meJson?.admin || null);
+      if (hasSession) {
+        const meRes = await fetch('/api/admin/me', { credentials: 'include' });
+        if (meRes.ok) {
+          const { data: meJson } = await parseJsonResponse<{ admin: AdminSessionProfile }>(meRes);
+          setAdmin(meJson?.admin || null);
+        } else {
+          setAdmin(null);
+        }
       } else {
         setAdmin(null);
       }
@@ -668,6 +687,49 @@ export function AdminDashboardPage({
     }
   }
 
+  async function handleSetupOwner(e: React.FormEvent) {
+    e.preventDefault();
+    setLoginError(null);
+    setAuthNotice(null);
+    if (setupPassword !== setupConfirmPassword) {
+      setLoginError('Passwords do not match.');
+      return;
+    }
+    setAuthSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/setup-owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: setupName.trim() || 'Owner',
+          email: setupEmail.trim(),
+          password: setupPassword,
+        }),
+      });
+      const { data: json, isJson } = await parseJsonResponse<{
+        error?: string;
+        admin?: AdminSessionProfile;
+      }>(res);
+      if (!isJson || !json) {
+        setLoginError(FRIENDLY_API_ERROR);
+        return;
+      }
+      if (!res.ok || !json.admin) {
+        setLoginError(json.error || 'Unable to create Owner account.');
+        return;
+      }
+      setSetupPassword('');
+      setSetupConfirmPassword('');
+      setAuthConfigured(true);
+      lastActivityRef.current = Date.now();
+      setAdmin(json.admin);
+      navigate('/admin', { replace: true });
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
   async function handleForgotPassword(e: React.FormEvent) {
     e.preventDefault();
     setLoginError(null);
@@ -679,17 +741,24 @@ export function AdminDashboardPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail }),
       });
-      const { data: json, isJson } = await parseJsonResponse<{ error?: string; message?: string }>(res);
+      const { data: json, isJson } = await parseJsonResponse<{
+        error?: string;
+        message?: string;
+        emailConfigured?: boolean;
+      }>(res);
       if (!isJson || !json) {
         setLoginError(FRIENDLY_API_ERROR);
         return;
+      }
+      if (typeof json.emailConfigured === 'boolean') {
+        setEmailConfigured(json.emailConfigured);
       }
       if (!res.ok) {
         setLoginError(json.error || 'Could not process password reset request');
         return;
       }
       setAuthNotice(
-        json.message || 'Reset link dispatched to myconcretektl@gmail.com if that account exists.'
+        json.message || 'Reset link dispatched. Please check Inbox and Spam.'
       );
     } finally {
       setAuthSubmitting(false);
@@ -1138,14 +1207,73 @@ export function AdminDashboardPage({
           </div>
 
           {authConfigured === false && (
-            <div className="rounded-xl border border-amber-400/60 bg-amber-50 dark:bg-amber-950/30 p-3.5 text-xs text-amber-900 dark:text-amber-200 space-y-1">
-              <p className="font-bold">Initial Setup Required</p>
-              <p>
-                Set <code className="font-mono">ADMIN_EMAIL</code> and{' '}
-                <code className="font-mono">ADMIN_PASSWORD</code> in <code className="font-mono">.env</code> and restart
-                the server to initialize the Owner account. See <code className="font-mono">README.md</code>.
-              </p>
-            </div>
+            <form onSubmit={handleSetupOwner} className="space-y-4">
+              <div className="rounded-xl border border-amber-400/60 bg-amber-50 dark:bg-amber-950/30 p-3.5 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+                <p className="font-bold">First-Time Owner Account Setup</p>
+                <p>
+                  No Owner login has been claimed yet. Create your Owner email and password below to open the Admin Console.
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Owner Name</label>
+                <input
+                  type="text"
+                  required
+                  value={setupName}
+                  onChange={(e) => setSetupName(e.target.value)}
+                  placeholder="Owner"
+                  className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Owner Email</label>
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={setupEmail}
+                  onChange={(e) => setSetupEmail(e.target.value)}
+                  placeholder="myconcretektl@gmail.com"
+                  className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Choose Strong Password</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={setupPassword}
+                  onChange={(e) => setSetupPassword(e.target.value)}
+                  placeholder="Min 8 chars (letters + number or symbol)"
+                  className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Confirm Password</label>
+                <input
+                  type="password"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={setupConfirmPassword}
+                  onChange={(e) => setSetupConfirmPassword(e.target.value)}
+                  placeholder="Re-enter password"
+                  className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
+                />
+              </div>
+
+              {loginError && <p className="text-xs text-red-600 font-medium">{loginError}</p>}
+
+              <button
+                type="submit"
+                disabled={authSubmitting}
+                className="w-full btn-orange-pill py-2.5 text-sm disabled:opacity-60"
+              >
+                {authSubmitting ? 'Creating Owner Account...' : 'Create Owner Account & Sign In'}
+              </button>
+            </form>
           )}
 
           {authNotice && (
@@ -1154,7 +1282,7 @@ export function AdminDashboardPage({
             </div>
           )}
 
-          {authView === 'signin' && (
+          {authConfigured !== false && authView === 'signin' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Admin / Staff Email</label>
@@ -1164,7 +1292,7 @@ export function AdminDashboardPage({
                   autoComplete="email"
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="Enter your admin email"
+                  placeholder="myconcretektl@gmail.com"
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                 />
               </div>
@@ -1207,7 +1335,7 @@ export function AdminDashboardPage({
             </form>
           )}
 
-          {authView === 'otp' && (
+          {authConfigured !== false && authView === 'otp' && (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <p className="text-xs text-[var(--muted)]">
                 Enter the 6-digit verification code sent to <strong>{otpMaskedEmail}</strong>.
@@ -1250,11 +1378,27 @@ export function AdminDashboardPage({
             </form>
           )}
 
-          {authView === 'forgot' && (
+          {authConfigured !== false && authView === 'forgot' && (
             <form onSubmit={handleForgotPassword} className="space-y-4">
-              <p className="text-xs text-[var(--muted)]">
-                A password reset link will be emailed to <code className="font-mono">myconcretektl@gmail.com</code>.
-              </p>
+              {!emailConfigured ? (
+                <div className="rounded-xl border border-amber-400/60 bg-amber-50 dark:bg-amber-950/30 p-3.5 text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+                  <p className="font-bold">Email Delivery Not Configured Yet</p>
+                  <p>
+                    <code className="font-mono">SMTP_USER</code> / <code className="font-mono">SMTP_PASS</code> (Gmail App Password) or{' '}
+                    <code className="font-mono">RESEND_API_KEY</code> is empty, so reset links cannot reach{' '}
+                    <code className="font-mono">myconcretektl@gmail.com</code> yet.
+                  </p>
+                  <p>
+                    To regain access right away, set <code className="font-mono">ADMIN_EMAIL</code> &amp;{' '}
+                    <code className="font-mono">ADMIN_PASSWORD</code> in your environment variables and restart/redeploy.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--muted)]">
+                  A password reset link will be emailed to your registered admin email (for example{' '}
+                  <code className="font-mono">myconcretektl@gmail.com</code>).
+                </p>
+              )}
               <div>
                 <label className="block text-xs font-medium text-[var(--muted)] mb-1.5">Account Email</label>
                 <input
@@ -1262,7 +1406,7 @@ export function AdminDashboardPage({
                   required
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  placeholder="Enter account email"
+                  placeholder="myconcretektl@gmail.com"
                   className="w-full rounded-xl border border-[#D7E4FF] dark:border-[#264096] bg-[var(--bg)] px-3.5 py-2.5 text-sm"
                 />
               </div>

@@ -17,7 +17,9 @@ import {
   seedDatabase,
 } from './server/seed.ts';
 import {
+  ADMIN_COOKIE_NAME,
   type AuthedRequest,
+  IDLE_TIMEOUT_MS,
   LOCKOUT_DURATION_MS,
   MAX_FAILED_ATTEMPTS,
   cleanWhatsappNumber,
@@ -29,6 +31,7 @@ import {
   hashToken,
   haversineDistanceKm,
   logAdminLogin,
+  parseCookies,
   rateLimit,
   requireAdmin,
   requireOwner,
@@ -1573,11 +1576,141 @@ function clearAttemptLock(key: string): void {
   db.prepare(`DELETE FROM admin_login_attempts WHERE key = ?`).run(key);
 }
 
-app.get('/api/admin/auth-status', (_req, res) => {
+app.get('/api/admin/auth-status', (req, res) => {
   const row = db
     .prepare(`SELECT COUNT(*) AS count FROM admin_users WHERE role = 'owner'`)
     .get() as { count: number };
-  res.json({ configured: row.count > 0 });
+  const channel = getNotificationChannelStatus();
+  const envManaged = Boolean(
+    (process.env.ADMIN_EMAIL || '').trim() && (process.env.ADMIN_PASSWORD || '').length >= 8
+  );
+
+  let authenticated = false;
+  const rawToken = parseCookies(req)[ADMIN_COOKIE_NAME] || '';
+  if (rawToken) {
+    const tokenHash = hashToken(rawToken);
+    const sess = db
+      .prepare(`SELECT last_activity_at, expires_at FROM admin_sessions WHERE token_hash = ?`)
+      .get(tokenHash) as { last_activity_at: number; expires_at: number } | undefined;
+    const now = Date.now();
+    if (sess && sess.expires_at > now && now - sess.last_activity_at <= IDLE_TIMEOUT_MS) {
+      authenticated = true;
+    }
+  }
+
+  res.json({
+    configured: row.count > 0,
+    emailConfigured: channel.emailConfigured,
+    envManaged,
+    authenticated,
+  });
+});
+
+app.post('/api/admin/setup-owner', rateLimit(10, 60_000), (req, res) => {
+  const envEmail = (process.env.ADMIN_EMAIL || '').trim();
+  const envPass = process.env.ADMIN_PASSWORD || '';
+  if (envEmail && envPass.length >= 8) {
+    res.status(403).json({
+      error:
+        'Owner credentials are configured via ADMIN_EMAIL and ADMIN_PASSWORD environment variables. Sign in with those credentials.',
+    });
+    return;
+  }
+
+  const existingOwnerCount = (
+    db.prepare(`SELECT COUNT(*) AS count FROM admin_users WHERE role = 'owner'`).get() as {
+      count: number;
+    }
+  ).count;
+  if (existingOwnerCount > 0) {
+    res.status(403).json({
+      error: 'An Owner account is already configured. Please sign in instead.',
+    });
+    return;
+  }
+
+  const schema = z.object({
+    name: z.string().trim().min(2).max(80).optional(),
+    email: z.string().trim().email('Enter a valid email address'),
+    password: z.string().min(8).max(128),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0]?.message || 'Invalid setup details.' });
+    return;
+  }
+  if (!isStrongPassword(parsed.data.password)) {
+    res.status(400).json({
+      error: 'Password must be at least 8 characters and include letters plus a number or symbol.',
+    });
+    return;
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const name = sanitizeText(parsed.data.name || 'Owner', 80) || 'Owner';
+  const passwordHash = bcrypt.hashSync(parsed.data.password, 12);
+
+  // Atomic guard: insert only if still zero owners in DB
+  db.exec('BEGIN IMMEDIATE');
+  let newUserId = 0;
+  try {
+    const checkCount = (
+      db.prepare(`SELECT COUNT(*) AS count FROM admin_users WHERE role = 'owner'`).get() as {
+        count: number;
+      }
+    ).count;
+    if (checkCount > 0) {
+      db.exec('ROLLBACK');
+      res.status(403).json({ error: 'An Owner account is already configured. Please sign in.' });
+      return;
+    }
+    const existingByEmail = db
+      .prepare(`SELECT id FROM admin_users WHERE lower(email) = ?`)
+      .get(email) as { id: number } | undefined;
+    if (existingByEmail) {
+      db.prepare(
+        `UPDATE admin_users SET name = ?, password_hash = ?, role = 'owner', must_change_password = 0 WHERE id = ?`
+      ).run(name, passwordHash, existingByEmail.id);
+      newUserId = existingByEmail.id;
+    } else {
+      const info = db
+        .prepare(
+          `INSERT INTO admin_users (email, name, password_hash, role, must_change_password)
+           VALUES (?, ?, ?, 'owner', 0)`
+        )
+        .run(email, name, passwordHash);
+      newUserId = Number(info.lastInsertRowid);
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      // ignore rollback error
+    }
+    throw err;
+  }
+
+  createAdminSession(newUserId, req, res);
+  db.prepare(`UPDATE admin_users SET last_login_at = datetime('now') WHERE id = ?`).run(newUserId);
+  logAdminLogin({
+    email,
+    userId: newUserId,
+    role: 'owner',
+    status: 'owner_setup',
+    req,
+  });
+
+  res.status(201).json({
+    admin: {
+      id: newUserId,
+      email,
+      name,
+      role: 'owner',
+      mustChangePassword: false,
+      twoFactorEnabled: false,
+    },
+  });
 });
 
 app.get('/api/admin/me', requireAdmin, (req: AuthedRequest, res) => {
@@ -1884,6 +2017,18 @@ app.post(
     res.status(400).json({ error: 'Enter a valid email address.' });
     return;
   }
+
+  const channel = getNotificationChannelStatus();
+  if (!channel.emailConfigured) {
+    res.status(503).json({
+      ok: false,
+      emailConfigured: false,
+      error:
+        'Password reset email cannot be sent because SMTP / Resend email credentials are not configured on this server. To reset your login without email, set ADMIN_EMAIL and ADMIN_PASSWORD in your environment variables and restart/redeploy, or configure SMTP_USER and SMTP_PASS (16-digit Gmail App Password).',
+    });
+    return;
+  }
+
   const email = parsed.data.email.trim().toLowerCase();
   const user = db
     .prepare(`SELECT id, email, role FROM admin_users WHERE lower(email) = ?`)
@@ -1898,13 +2043,31 @@ app.post(
 
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
     const resetLink = `${baseUrl}/admin/login?resetToken=${rawToken}`;
-    const targetInbox = 'myconcretektl@gmail.com';
-    await sendNotificationEmail(
+    const targetInbox = user.email;
+    const deliveryResult = await sendNotificationEmail(
       targetInbox,
       `MY CONCRETE Admin Password Reset Request (${user.email})`,
       `A password reset was requested for admin account ${user.email}.\n\nOpen this link within 30 minutes to set a new password:\n${resetLink}\n\nIf you did not request this, you can safely ignore this message.`,
       `Password reset link emailed to ${targetInbox} for ${user.email} (link redacted)`
     );
+
+    if (deliveryResult === 'logged') {
+      logAdminLogin({
+        email: user.email,
+        userId: user.id,
+        role: user.role,
+        status: 'password_reset_email_failed',
+        req,
+      });
+      res.status(502).json({
+        ok: false,
+        emailConfigured: true,
+        error:
+          'SMTP / Resend rejected sending the reset email. If using Gmail SMTP, make sure SMTP_PASS is a 16-character Google App Password (not your normal Gmail login password).',
+      });
+      return;
+    }
+
     logAdminLogin({
       email: user.email,
       userId: user.id,
@@ -1916,8 +2079,8 @@ app.post(
 
   res.json({
     ok: true,
-    message:
-      'If an active admin account exists for that email, a reset link has been sent to myconcretektl@gmail.com.',
+    emailConfigured: true,
+    message: `If an active admin account exists for ${email}, a reset link has been sent. Please check Inbox and Spam.`,
   });
   })
 );
